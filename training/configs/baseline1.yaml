@@ -1,0 +1,64 @@
+version: baseline1_v1
+data:
+  labeled_dataset: ../data_pipeline/output/final_labeled_dataset.parquet
+targets:
+  domain_definition: semantic_7
+  logic_component_map:
+    logic_arc_agi: logic
+    logic_classic: logic
+embedding:
+  model_id: Qwen/Qwen3-Embedding-0.6B
+  revision: 97b0c614be4d77ee51c0cef4e5f07c00f9eb65b3
+  dimension: 1024
+  normalize: true
+  dtype: bfloat16
+  mps_dtype: float16
+  device: mps
+  pooling: last_token
+  max_position_embeddings: 32768
+  safe_max_tokens: 2048
+  chunk_size_tokens: 1920
+  chunk_overlap_tokens: 128
+  relevance_temperature: 0.10
+  task_instruction: "Classify the semantic task domain and the minimum language-model capability required to answer this request reliably"
+features:
+  builder_version: hierarchical_delta_v1
+  semantic_blocks: [task, context_mean_delta, context_relevant_delta]
+  structural:
+    - log1p_total_tokens
+    - log1p_character_count
+    - log1p_message_count
+    - log1p_chunk_count
+    - log1p_system_tokens
+    - log1p_user_tokens
+    - log1p_history_tokens
+    - log1p_retrieved_context_tokens
+    - log1p_tool_schema_tokens
+    - log1p_tool_count
+    - structured_output_flag
+    - json_schema_requirement_flag
+    - modality_text_flag
+    - modality_image_flag
+    - modality_audio_flag
+  scalar_scaler: StandardScaler
+splits:
+  primary_evaluation: source_isolated
+  secondary_evaluation: prompt_stratified
+  singleton_source_oof_fallback: stratified_prompt
+  seeds: [17, 29, 43, 71, 101]
+  train_fraction: 0.70
+  validation_fraction: 0.15
+  test_fraction: 0.15
+  search_iterations: 5000
+  minimum_train_classes: 7
+  minimum_resolved_tier_classes: 4
+  oof_folds: 5
+logistic_regression:
+  C: [0.01, 0.1, 1.0, 10.0]
+  class_weight: [null, balanced]
+  solver: lbfgs
+  max_iter: 2000
+  multi_class: multinomial
+evaluation:
+  low_confidence_threshold: 0.60
+  calibration_bins: 10

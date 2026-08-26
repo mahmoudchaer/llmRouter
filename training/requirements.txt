@@ -1,0 +1,12 @@
+numpy>=2.0
+pandas>=2.2
+pyarrow>=16
+scikit-learn>=1.5
+PyYAML>=6
+joblib>=1.4
+torch==2.7.1
+transformers==4.53.3
+pytest>=8
+xgboost==3.4.1
+peft==0.17.1
+accelerate==1.10.1

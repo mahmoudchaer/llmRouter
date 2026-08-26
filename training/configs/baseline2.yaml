@@ -1,0 +1,42 @@
+version: baseline2_xgboost_v1
+baseline1_config: configs/baseline1.yaml
+data:
+  labeled_dataset: ../data_pipeline/output/final_labeled_dataset.parquet
+cache:
+  embedding_file: cache/embeddings/qwen3_0.6b_59502a849e871a3c.npz
+  metadata_file: cache/embeddings/qwen3_0.6b_59502a849e871a3c.metadata.json
+  expected_fingerprint: 59502a849e871a3c
+  counts_file: cache/features/request_counts.parquet
+splits:
+  seeds: [17, 29, 43, 71, 101]
+  primary_pattern: splits/grouped_split_{seed}.json
+  secondary_pattern: splits/prompt_stratified_split_{seed}.parquet
+  oof_folds: 5
+xgboost:
+  version: 3.4.1
+  search_seed: 20260826
+  configurations: 16
+  n_estimators: [300, 600, 1000]
+  max_depth: [3, 5, 7]
+  learning_rate: [0.03, 0.07, 0.10]
+  subsample: [0.8, 1.0]
+  colsample_bytree: [0.7, 1.0]
+  min_child_weight: [1, 5]
+  reg_lambda: [1, 5]
+  reg_alpha: [0.0, 0.1]
+  weighting: [none, balanced]
+  early_stopping_rounds: 50
+  eval_metric: mlogloss
+  tree_method: hist
+  device: cpu
+  n_jobs: -1
+domain_specific_tier:
+  minimum_resolved_train_rows: 500
+  minimum_rows_per_tier: 20
+  require_all_four_tiers: true
+  fallback: global_features_only
+importance:
+  gain: true
+  shap_sample_rows: 500
+  shap_seed: 911
+

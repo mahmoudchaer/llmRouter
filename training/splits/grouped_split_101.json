@@ -1,0 +1,33 @@
+{
+  "datasets": {
+    "aime": "test",
+    "arc-agi": "validation",
+    "arcc": "train",
+    "arenahard": "train",
+    "arenahard_coding": "validation",
+    "arenahard_creative_writing": "train",
+    "arenahard_math": "train",
+    "bbh": "test",
+    "emorynlp": "train",
+    "finqa": "train",
+    "gpqa": "validation",
+    "hle": "test",
+    "humaneval": "train",
+    "kandk": "train",
+    "korbench": "train",
+    "livecodebench": "train",
+    "livemathbench": "train",
+    "math500": "train",
+    "mathbench": "train",
+    "mbpp": "train",
+    "medqa": "train",
+    "meld": "train",
+    "mmlupro": "validation",
+    "simpleqa": "train",
+    "swe-bench": "test",
+    "tau2": "train",
+    "winogrande": "train"
+  },
+  "objective": 0.2129892154598605,
+  "seed": 101
+}

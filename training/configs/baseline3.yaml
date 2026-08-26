@@ -1,0 +1,71 @@
+version: baseline3_hierarchical_v1
+model:
+  model_id: Qwen/Qwen3-Embedding-0.6B
+  revision: 97b0c614be4d77ee51c0cef4e5f07c00f9eb65b3
+  hidden_size: 1024
+  pooling: final_hidden_last_non_padding_pre_l2
+  request_layer_norm: true
+  dropout: 0.10
+request:
+  abstraction_version: structured_sections_v1
+  chunk_size_tokens: 1024
+  chunk_overlap_tokens: 128
+  candidate_chunk_sizes: [1024, 2048, 4096, 8192]
+  append_eos_per_chunk: true
+  no_silent_truncation: true
+aggregation:
+  primary: mean
+  prepared_alternative: attention
+  attention_hidden_size: 128
+structural_features:
+  enabled: true
+  dimension: 15
+  scaler: StandardScaler_train_only
+training:
+  mode: lora
+  full_finetune_supported: true
+  lora:
+    rank: 16
+    alpha: 32
+    dropout: 0.05
+    target_modules: [q_proj, k_proj, v_proj, o_proj]
+    rank_candidates: [8, 16, 32]
+    alpha_candidates: [16, 32, 64]
+  optimizer: AdamW
+  encoder_learning_rate: 0.00002
+  head_learning_rate: 0.0001
+  weight_decay: 0.01
+  warmup_ratio: 0.05
+  epochs: 3
+  epoch_candidates: [2, 3, 5]
+  gradient_clip_norm: 1.0
+  max_tokens_per_chunk_microbatch: 2048
+  max_tokens_per_optimizer_step: 8192
+  gradient_accumulation_requests: 8
+  gradient_checkpointing: true
+  streaming_gradient_replay: true
+loss:
+  domain_weight: 1.0
+  tier_weight: 1.0
+  domain: cross_entropy
+  tier: cross_entropy_masked_unresolved
+splits:
+  seeds: [17, 29, 43, 71, 101]
+  primary_pattern: splits/grouped_split_{seed}.json
+  secondary_pattern: splits/prompt_stratified_split_{seed}.parquet
+experiments:
+  - name: baseline3a
+    aggregation: mean
+    structural_features: true
+  - name: baseline3a_no_struct
+    aggregation: mean
+    structural_features: false
+  - name: baseline3b_prepared
+    aggregation: attention
+    structural_features: true
+    run_by_default: false
+early_stopping:
+  primary: validation_loss
+  patience: 2
+  tracked_routing_metrics: [macro_f1, mae, under_routing, severe_under_routing]
+

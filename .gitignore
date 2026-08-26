@@ -1,0 +1,50 @@
+# Local environments and Python build products
+.venv/
+**/.venv/
+__pycache__/
+**/__pycache__/
+.pytest_cache/
+**/.pytest_cache/
+*.py[cod]
+
+# Model and feature caches
+cache/
+**/cache/
+.cache/
+**/.cache/
+huggingface/
+**/huggingface/
+
+# Generated data and reports are transferred separately when required
+data_pipeline/
+training/output/
+training/reports/
+output/
+reports/
+
+# Training state and logs
+checkpoints/
+**/checkpoints/
+runs/
+**/runs/
+logs/
+**/logs/
+wandb/
+**/wandb/
+*.log
+
+# Large model/data formats should never enter Git accidentally
+*.safetensors
+*.bin
+*.pt
+*.pth
+*.ckpt
+*.npz
+*.npy
+*.f32
+*.parquet
+*.jsonl
+
+# OS/editor files
+.DS_Store
+*.swp
