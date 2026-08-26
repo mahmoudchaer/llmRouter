@@ -41,9 +41,22 @@ class HierarchicalRouter(nn.Module):
         shared=self.dropout(self.request_norm(request))
         return {"domain_logits":self.domain_head(shared),"tier_logits":self.tier_head(shared),"request_vector":shared}
 
+    def forward_request_batch(self,request_vectors,structural=None):
+        if self.structural_dim:
+            if structural is None:
+                structural=torch.zeros((request_vectors.size(0),self.structural_dim),device=request_vectors.device,dtype=request_vectors.dtype)
+            request_vectors=torch.cat([request_vectors,structural.to(request_vectors.dtype)],dim=1)
+        shared=self.dropout(self.request_norm(request_vectors))
+        return {"domain_logits":self.domain_head(shared),"tier_logits":self.tier_head(shared),"request_vector":shared}
+
 def multitask_loss(outputs,domain_label,tier_label,domain_weight=1.,tier_weight=1.):
     domain=F.cross_entropy(outputs["domain_logits"].unsqueeze(0),domain_label.view(1))
     resolved=tier_label.ge(0)
     tier=F.cross_entropy(outputs["tier_logits"].unsqueeze(0),tier_label.clamp_min(0).view(1)) if resolved else domain.new_zeros(())
     return {"loss":domain_weight*domain+tier_weight*tier,"domain_loss":domain,"tier_loss":tier,"tier_mask":resolved}
 
+def batched_multitask_loss(outputs,domain_labels,tier_labels,domain_weight=1.,tier_weight=1.):
+    domain=F.cross_entropy(outputs["domain_logits"],domain_labels)
+    resolved=tier_labels.ge(0)
+    tier=F.cross_entropy(outputs["tier_logits"][resolved],tier_labels[resolved]) if resolved.any() else domain.new_zeros(())
+    return {"loss":domain_weight*domain+tier_weight*tier,"domain_loss":domain,"tier_loss":tier,"tier_mask":resolved}

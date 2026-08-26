@@ -7,6 +7,7 @@ import os
 import random
 import subprocess
 import time
+import pickle
 from pathlib import Path
 
 import numpy as np
@@ -22,6 +23,7 @@ from .build_baseline3_model import build, parameter_report
 from .calibration_analysis import confidence_bins
 from .evaluate import domain_metrics, tier_metrics
 from .hierarchical_chunking import chunk_token_ids
+from .hierarchical_router_model import batched_multitask_loss
 from .streaming_gradient import microbatches, pad_chunk_batch, streaming_request_backward
 
 DOMAIN_CLASSES = ["affective", "code", "instruction_following", "knowledge", "logic", "math", "tool_use"]
@@ -57,7 +59,9 @@ def structural_raw(token_count, char_count, chunk_count):
     ], dtype=np.float32)
 
 
-def prepare(df, tokenizer, split, chunk_size, overlap):
+def prepare(df, tokenizer, split, chunk_size, overlap, cache_path=None):
+    if cache_path and Path(cache_path).exists():
+        with Path(cache_path).open("rb") as f:return pickle.load(f)
     df = df.copy()
     df["partition"] = df.source_dataset.map(split)
     if df.partition.isna().any(): raise ValueError("Some source datasets are absent from split definition")
@@ -80,7 +84,35 @@ def prepare(df, tokenizer, split, chunk_size, overlap):
             "tier": int(row.tier) - 1 if bool(row.resolved) else -1,
             "resolved": bool(row.resolved), "raw_tokens": len(token_ids[pos]),
         })
-    return records, scaler
+    result=(records,scaler)
+    if cache_path:
+        Path(cache_path).parent.mkdir(parents=True,exist_ok=True)
+        with Path(cache_path).open("wb") as f:pickle.dump(result,f,pickle.HIGHEST_PROTOCOL)
+    return result
+
+
+def single_chunk_batches(records,max_padded_tokens,seed):
+    rng=random.Random(seed);ordered=sorted(records,key=lambda r:len(r["chunks"][0]))
+    buckets=[ordered[i:i+512] for i in range(0,len(ordered),512)]
+    for bucket in buckets:rng.shuffle(bucket)
+    rng.shuffle(buckets);batch=[];longest=0
+    for record in [r for bucket in buckets for r in bucket]:
+        length=len(record["chunks"][0])
+        if batch and max(longest,length)*(len(batch)+1)>max_padded_tokens:
+            yield batch;batch=[];longest=0
+        batch.append(record);longest=max(longest,length)
+    if batch:yield batch
+
+
+def train_single_batch(model,batch,pad_id,device):
+    ids,mask=pad_chunk_batch([r["chunks"][0] for r in batch],pad_id,device)
+    vectors=model.encode_chunk_batch(ids,mask)
+    structural=torch.tensor(np.stack([r["structural"] for r in batch]),device=device,dtype=vectors.dtype)
+    outputs=model.forward_request_batch(vectors,structural)
+    domains=torch.tensor([r["domain"] for r in batch],device=device)
+    tiers=torch.tensor([r["tier"] for r in batch],device=device)
+    losses=batched_multitask_loss(outputs,domains,tiers);losses["loss"].backward()
+    return {k:(float(v.detach()) if v.ndim==0 else v) for k,v in losses.items()}
 
 
 @torch.no_grad()
@@ -158,11 +190,12 @@ def main():
     ap=argparse.ArgumentParser();ap.add_argument("--config",default="configs/baseline3.yaml");ap.add_argument("--data",default="data/final_labeled_dataset.parquet")
     ap.add_argument("--split",default="splits/grouped_split_17.json");ap.add_argument("--output",default="output/baseline3a_seed17")
     ap.add_argument("--max-train",type=int);ap.add_argument("--max-validation",type=int);ap.add_argument("--epochs",type=int);ap.add_argument("--skip-test",action="store_true")
+    ap.add_argument("--batch-token-budget",type=int,default=32768);ap.add_argument("--token-cache",default="cache/baseline3_tokens_seed17.pkl")
     args=ap.parse_args();cfg=yaml.safe_load(Path(args.config).read_text());seed=17;seed_everything(seed);device="cuda"
     output=Path(args.output);output.mkdir(parents=True,exist_ok=True);(output/"logs").mkdir(exist_ok=True)
     tokenizer=AutoTokenizer.from_pretrained(cfg["model"]["model_id"],revision=cfg["model"]["revision"])
     df=pd.read_parquet(args.data);split=json.loads(Path(args.split).read_text())["datasets"]
-    records,scaler=prepare(df,tokenizer,split,2048,128);train=[r for r in records if r["partition"]=="train"];val=[r for r in records if r["partition"]=="validation"];test=[r for r in records if r["partition"]=="test"]
+    records,scaler=prepare(df,tokenizer,split,2048,128,args.token_cache);train=[r for r in records if r["partition"]=="train"];val=[r for r in records if r["partition"]=="validation"];test=[r for r in records if r["partition"]=="test"]
     if args.max_train:train=train[:args.max_train]
     if args.max_validation:val=val[:args.max_validation]
     model=build(cfg,device=device,aggregation="mean",structural=True);model.train();print(json.dumps(parameter_report(model)),flush=True)
@@ -170,21 +203,27 @@ def main():
     for name,p in model.named_parameters():
         if p.requires_grad:(encoder_params if name.startswith("encoder.") else head_params).append(p)
     optimizer=torch.optim.AdamW([{"params":encoder_params,"lr":cfg["training"]["encoder_learning_rate"]},{"params":head_params,"lr":cfg["training"]["head_learning_rate"]}],weight_decay=cfg["training"]["weight_decay"])
-    epochs=args.epochs or cfg["training"]["epochs"];accum=cfg["training"]["gradient_accumulation_requests"];total_steps=math.ceil(len(train)/accum)*epochs
+    epochs=args.epochs or cfg["training"]["epochs"]
+    single=[r for r in train if len(r["chunks"])==1];multi=[r for r in train if len(r["chunks"])>1]
+    steps_per_epoch=len(list(single_chunk_batches(single,args.batch_token_budget,seed)))+len(multi);total_steps=steps_per_epoch*epochs
     scheduler=get_linear_schedule_with_warmup(optimizer,int(total_steps*cfg["training"]["warmup_ratio"]),total_steps)
     pad=tokenizer.pad_token_id or tokenizer.eos_token_id;max_tokens=cfg["training"]["max_tokens_per_chunk_microbatch"]
     history=[];best=float("inf");global_step=0;torch.cuda.reset_peak_memory_stats();run_start=time.perf_counter()
     for epoch in range(1,epochs+1):
-        model.train();random.Random(seed+epoch).shuffle(train);optimizer.zero_grad(set_to_none=True);epoch_start=time.perf_counter();losses=[];util=[];tokens=0
-        for i,r in enumerate(train,1):
-            structural=torch.tensor(r["structural"],device=device,dtype=next(model.parameters()).dtype)
-            out=streaming_request_backward(model,r["chunks"],structural,torch.tensor(r["domain"],device=device),torch.tensor(r["tier"],device=device),pad,max_tokens,loss_scale=1/accum,seed=seed*100000+epoch*20000+i)
-            losses.append(out["loss"]);tokens+=2*sum(map(len,r["chunks"]))
-            if i%accum==0 or i==len(train):
-                torch.nn.utils.clip_grad_norm_([p for p in model.parameters() if p.requires_grad],cfg["training"]["gradient_clip_norm"]);optimizer.step();scheduler.step();optimizer.zero_grad(set_to_none=True);global_step+=1
-            if i%100==0 or i==len(train):
+        model.train();random.Random(seed+epoch).shuffle(multi);optimizer.zero_grad(set_to_none=True);epoch_start=time.perf_counter();losses=[];util=[];tokens=0;seen=0
+        work=[("single",batch) for batch in single_chunk_batches(single,args.batch_token_budget,seed+epoch)]+[("multi",r) for r in multi]
+        random.Random(seed+epoch).shuffle(work)
+        for work_i,(kind,item) in enumerate(work,1):
+            if kind=="single":
+                out=train_single_batch(model,item,pad,device);batch_n=len(item);tokens+=sum(len(r["chunks"][0]) for r in item)
+            else:
+                r=item;structural=torch.tensor(r["structural"],device=device,dtype=next(model.parameters()).dtype)
+                out=streaming_request_backward(model,r["chunks"],structural,torch.tensor(r["domain"],device=device),torch.tensor(r["tier"],device=device),pad,max_tokens,seed=seed*100000+epoch*20000+work_i);batch_n=1;tokens+=2*sum(map(len,r["chunks"]))
+            losses.append(out["loss"]);seen+=batch_n
+            torch.nn.utils.clip_grad_norm_([p for p in model.parameters() if p.requires_grad],cfg["training"]["gradient_clip_norm"]);optimizer.step();scheduler.step();optimizer.zero_grad(set_to_none=True);global_step+=1
+            if work_i%25==0 or work_i==len(work):
                 u=gpu_utilization();util.append(u["gpu_utilization_percent"] or 0)
-                event={"epoch":epoch,"request":i,"global_step":global_step,"train_loss_recent":float(np.mean(losses[-100:])),"learning_rates":[g["lr"] for g in optimizer.param_groups],"elapsed_seconds":time.perf_counter()-epoch_start,"tokens_per_second":tokens/(time.perf_counter()-epoch_start),"peak_vram_bytes":torch.cuda.max_memory_allocated(),**u}
+                event={"epoch":epoch,"requests_seen":seen,"work_items":work_i,"single_batch_token_budget":args.batch_token_budget,"global_step":global_step,"train_loss_recent":float(np.mean(losses[-25:])),"learning_rates":[g["lr"] for g in optimizer.param_groups],"elapsed_seconds":time.perf_counter()-epoch_start,"tokens_per_second":tokens/(time.perf_counter()-epoch_start),"peak_vram_bytes":torch.cuda.max_memory_allocated(),**u}
                 with (output/"logs"/"train.jsonl").open("a") as f:f.write(json.dumps(event)+"\n")
                 print(json.dumps(event),flush=True)
         val_metrics,_=evaluate_partition(model,val,pad,max_tokens,device);epoch_record={"epoch":epoch,"train_loss":float(np.mean(losses)),"epoch_seconds":time.perf_counter()-epoch_start,"train_tokens_per_second":tokens/(time.perf_counter()-epoch_start),"average_sampled_gpu_utilization":float(np.mean(util)) if util else None,"peak_vram_bytes":torch.cuda.max_memory_allocated(),"validation":val_metrics}
