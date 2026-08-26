@@ -1,0 +1,32 @@
+version: domain_router_eval_v1
+seed: 1701
+samples_per_domain: 70
+common_taxonomy: [affective, code, instruction_following, knowledge, logic, math, tool_use]
+zen:
+  router_id: zenlm/zen-router
+  router_revision: ffb704b3094ace3bea962a9041b137cef8d8a95c
+  backbone_id: zenlm/zen-nano-0.6b
+  backbone_revision: 442ced4e0f89e6e00b209d7f0f7d59cd63d2e1ef
+  native_labels: [code, reasoning, math, creative, vision, long_context, cheap_chat, general]
+  mapping:
+    code: {common: code, status: exact}
+    reasoning: {common: logic, status: approximate}
+    math: {common: math, status: exact}
+    creative: {common: instruction_following, status: ambiguous}
+    cheap_chat: {common: affective, status: ambiguous}
+    general: {common: knowledge, status: approximate}
+    vision: {common: null, status: unmapped}
+    long_context: {common: null, status: unmapped}
+arch:
+  model_id: katanemo/Arch-Router-1.5B
+  revision: 5b156890a91b1035a86f82faf1a651debf309009
+  native_behavior: user_defined_domain_action_routes
+  mapping: configured route names map identically; other/invalid outputs are unmapped
+  routes:
+    - {name: affective, description: Emotion recognition, sentiment, interpersonal affect, dialogue emotion, empathy, or emotional-state understanding.}
+    - {name: code, description: Programming, software engineering, code generation, debugging, APIs, algorithms, or repository changes.}
+    - {name: instruction_following, description: Following complex natural-language instructions, writing or transformation constraints, creative writing, or general assistant compliance.}
+    - {name: knowledge, description: Factual questions, professional or academic knowledge, retrieval-style question answering, medicine, finance, science, or general information.}
+    - {name: logic, description: Symbolic, deductive, commonsense, puzzle, rule-based, or abstract reasoning tasks where reasoning is central.}
+    - {name: math, description: Arithmetic, algebra, geometry, probability, proofs, competition mathematics, or quantitative problem solving.}
+    - {name: tool_use, description: Choosing or using external tools, APIs, functions, workflows, bookings, databases, or multi-step agent actions.}
