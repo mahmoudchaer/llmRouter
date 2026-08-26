@@ -30,8 +30,9 @@ def main():
     for i in range(0,len(ordered),stride):picks.append(ordered[i])
     model=build_tier_router(cfg,"cuda","ordinal",True);model.train();optimizer=torch.optim.AdamW([p for p in model.parameters() if p.requires_grad],lr=2e-5)
     pad=tok.pad_token_id or eos;torch.cuda.reset_peak_memory_stats();total_real=total_padded=0;started=time.perf_counter();used=0
-    for batch in batches(picks,args.budget):
-        if used>=args.steps:break
+    candidate_batches=list(batches(picks,args.budget))
+    chosen=[candidate_batches[i] for i in np.linspace(0,len(candidate_batches)-1,min(args.steps,len(candidate_batches)),dtype=int)]
+    for batch in chosen:
         ids,mask=pad_chunk_batch([r["chunks"][0] for r in batch],pad,"cuda");vectors=model.encode_chunk_batch(ids,mask);struct=torch.zeros((len(batch),15),device="cuda",dtype=vectors.dtype)
         logits=model.route(vectors,struct);tiers=torch.tensor([r["tier"] for r in batch],device="cuda");loss=model.loss(logits,tiers,2.);loss.backward();optimizer.step();optimizer.zero_grad(set_to_none=True)
         total_real+=int(mask.sum());total_padded+=mask.numel();used+=1
