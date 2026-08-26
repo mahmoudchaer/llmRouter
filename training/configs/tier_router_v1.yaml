@@ -1,0 +1,49 @@
+version: tier_router_v1
+model:
+  model_id: Qwen/Qwen3-Embedding-4B
+  revision: 5cf2132abc99cad020ac570b19d031efec650f2b
+  pooling: final_hidden_last_non_padding_pre_l2
+request:
+  chunk_size_tokens: 2048
+  chunk_overlap_tokens: 128
+  append_eos_per_chunk: true
+  no_silent_truncation: true
+aggregation:
+  method: mean
+structural_features:
+  dimension: 15
+  ablations: [with_structural, without_structural]
+training:
+  mode: lora
+  lora:
+    rank: 16
+    alpha: 32
+    dropout: 0.05
+    target_modules: [q_proj, k_proj, v_proj, o_proj]
+  encoder_learning_rate: 0.00002
+  head_learning_rate: 0.0001
+  weight_decay: 0.01
+  warmup_ratio: 0.05
+  epochs: 3
+  gradient_clip_norm: 1.0
+  gradient_checkpointing: true
+  single_chunk_batch_token_budget_candidates: [8192, 16384, 32768]
+  chunk_microbatch_tokens: 2048
+losses:
+  experiments:
+    control_ce: {kind: cross_entropy}
+    ordinal_symmetric: {kind: cumulative_ordinal, under_route_weight: 1.0}
+    ordinal_asymmetric: {kind: cumulative_ordinal, under_route_weight_grid: [2.0, 3.0, 5.0]}
+selection:
+  lower_is_better: true
+  score: 0.35*(mae/3)+0.35*severe_under_routing+0.20*under_routing+0.10*(1-macro_f1)
+evaluation_cost_matrix:
+  description: under-routing uses squared tier distance; over-routing uses 0.25 times distance; normalized by maximum cost 9
+  matrix:
+    - [0.0, 0.25, 0.50, 0.75]
+    - [1.0, 0.0, 0.25, 0.50]
+    - [4.0, 1.0, 0.0, 0.25]
+    - [9.0, 4.0, 1.0, 0.0]
+splits:
+  seeds: [17, 29, 43, 71, 101]
+  primary_pattern: splits/grouped_split_{seed}.json
