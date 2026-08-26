@@ -1,6 +1,7 @@
 import torch
 from src.tier_ordinal import MonotonicOrdinalHead,tiers_to_cumulative,cumulative_ordinal_loss,cumulative_probabilities
 from src.tier_router_model import TierRouter
+from src.tier_streaming_gradient import tier_streaming_backward
 
 def test_cumulative_targets():
     got=tiers_to_cumulative(torch.tensor([0,1,2,3]))
@@ -29,3 +30,8 @@ def test_request_level_ordinal_gradient_reaches_encoder():
         chunks.append(model.encode_chunk_batch(ids,torch.ones_like(ids)))
     logits=model.route_chunks(torch.cat(chunks));model.loss(logits,torch.tensor([3]),3).backward()
     assert model.encoder.emb.weight.grad.abs().sum()>0
+
+def test_streaming_ordinal_gradient_reaches_encoder():
+    model=TierRouter(ToyEncoder(),8,"ordinal",0,0)
+    loss=tier_streaming_backward(model,[[1,2,3],[4,5,6]],None,torch.tensor(3),0,3,3.,7)
+    assert loss>0 and model.encoder.emb.weight.grad.abs().sum()>0
