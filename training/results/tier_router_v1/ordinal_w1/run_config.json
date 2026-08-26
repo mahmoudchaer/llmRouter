@@ -1,0 +1,46 @@
+{
+  "name": "ordinal_w1",
+  "loss": "ordinal",
+  "under_weight": 1.0,
+  "structural": true,
+  "seed": 17,
+  "git_commit": "9a470f94fe18c7d457bd65a597d8c21c86c37971",
+  "model": {
+    "model_id": "Qwen/Qwen3-Embedding-4B",
+    "revision": "5cf2132abc99cad020ac570b19d031efec650f2b",
+    "pooling": "final_hidden_last_non_padding_pre_l2"
+  },
+  "training": {
+    "mode": "lora",
+    "lora": {
+      "rank": 16,
+      "alpha": 32,
+      "dropout": 0.05,
+      "target_modules": [
+        "q_proj",
+        "k_proj",
+        "v_proj",
+        "o_proj"
+      ]
+    },
+    "encoder_learning_rate": 2e-05,
+    "head_learning_rate": 0.0001,
+    "weight_decay": 0.01,
+    "warmup_ratio": 0.05,
+    "epochs": 3,
+    "gradient_clip_norm": 1.0,
+    "gradient_checkpointing": true,
+    "single_chunk_batch_token_budget": 2048,
+    "single_chunk_batch_token_budget_candidates": [
+      2048,
+      4096,
+      8192,
+      16384
+    ],
+    "chunk_microbatch_tokens": 2048
+  },
+  "selection": {
+    "lower_is_better": true,
+    "score": "0.35*(mae/3)+0.35*severe_under_routing+0.20*under_routing+0.10*(1-macro_f1)"
+  }
+}
