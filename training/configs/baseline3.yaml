@@ -40,6 +40,7 @@ training:
   epoch_candidates: [2, 3, 5]
   gradient_clip_norm: 1.0
   max_tokens_per_chunk_microbatch: 2048
+  single_chunk_batch_token_budget: 8192
   max_tokens_per_optimizer_step: 8192
   gradient_accumulation_requests: 8
   gradient_checkpointing: true
@@ -68,4 +69,3 @@ early_stopping:
   primary: validation_loss
   patience: 2
   tracked_routing_metrics: [macro_f1, mae, under_routing, severe_under_routing]
-

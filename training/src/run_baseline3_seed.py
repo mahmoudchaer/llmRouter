@@ -190,8 +190,8 @@ def main():
     ap=argparse.ArgumentParser();ap.add_argument("--config",default="configs/baseline3.yaml");ap.add_argument("--data",default="data/final_labeled_dataset.parquet")
     ap.add_argument("--split",default="splits/grouped_split_17.json");ap.add_argument("--output",default="output/baseline3a_seed17")
     ap.add_argument("--max-train",type=int);ap.add_argument("--max-validation",type=int);ap.add_argument("--epochs",type=int);ap.add_argument("--skip-test",action="store_true")
-    ap.add_argument("--batch-token-budget",type=int,default=32768);ap.add_argument("--token-cache",default="cache/baseline3_tokens_seed17.pkl")
-    args=ap.parse_args();cfg=yaml.safe_load(Path(args.config).read_text());seed=17;seed_everything(seed);device="cuda"
+    ap.add_argument("--batch-token-budget",type=int);ap.add_argument("--token-cache",default="cache/baseline3_tokens_seed17.pkl")
+    args=ap.parse_args();cfg=yaml.safe_load(Path(args.config).read_text());args.batch_token_budget=args.batch_token_budget or cfg["training"]["single_chunk_batch_token_budget"];seed=17;seed_everything(seed);device="cuda"
     output=Path(args.output);output.mkdir(parents=True,exist_ok=True);(output/"logs").mkdir(exist_ok=True)
     tokenizer=AutoTokenizer.from_pretrained(cfg["model"]["model_id"],revision=cfg["model"]["revision"])
     df=pd.read_parquet(args.data);split=json.loads(Path(args.split).read_text())["datasets"]
