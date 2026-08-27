@@ -33,7 +33,7 @@ training:
   epochs: 3
   gradient_clip_norm: 1.0
   gradient_checkpointing: true
-  single_chunk_batch_token_budget: 8192
+  single_chunk_batch_token_budget: 2048
   chunk_microbatch_tokens: 2048
 losses:
   experiments:
