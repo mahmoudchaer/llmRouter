@@ -17,12 +17,12 @@ def batches(rows,budget):
     if batch:yield batch
 
 def main():
-    ap=argparse.ArgumentParser();ap.add_argument("--budget",type=int,required=True);ap.add_argument("--steps",type=int,default=12);ap.add_argument("--output",required=True);args=ap.parse_args()
-    cfg=yaml.safe_load(open("configs/tier_router_v1.yaml"));tok=AutoTokenizer.from_pretrained(cfg["model"]["model_id"],revision=cfg["model"]["revision"])
-    df=pd.read_parquet("data/final_labeled_dataset.parquet");split=json.load(open("splits/grouped_split_17.json"))["datasets"]
+    ap=argparse.ArgumentParser();ap.add_argument("--budget",type=int,required=True);ap.add_argument("--steps",type=int,default=12);ap.add_argument("--output",required=True);ap.add_argument("--config",default="configs/tier_router_v1.yaml");args=ap.parse_args()
+    cfg=yaml.safe_load(open(args.config));tok=AutoTokenizer.from_pretrained(cfg["model"]["model_id"],revision=cfg["model"]["revision"])
+    df=pd.read_parquet(cfg.get("artifacts",{}).get("dataset","data/final_labeled_dataset.parquet"));split=json.load(open("splits/grouped_split_17.json"))["datasets"]
     df=df[df.resolved & df.source_dataset.map(split).eq("train")].copy();eos=tok.eos_token_id;rows=[]
     for row in df.itertuples():
-        ids=tok.encode(str(row.prompt),add_special_tokens=False);cs=chunk_token_ids(ids,2048,128,eos)
+        ids=tok.encode(str(row.prompt),add_special_tokens=False);cs=chunk_token_ids(ids,cfg["request"]["chunk_size_tokens"],cfg["request"]["chunk_overlap_tokens"],eos)
         rows.append({"chunks":cs,"tier":int(row.tier)-1,"structural":np.zeros(15,np.float32)})
     single=[r for r in rows if len(r["chunks"])==1];multi=max(rows,key=lambda r:sum(map(len,r["chunks"])))
     # Quantile-stratified ordering keeps benchmark batches representative by length.
@@ -39,7 +39,7 @@ def main():
     torch.cuda.synchronize();elapsed=time.perf_counter()-started
     # Verify the longest training request through the dedicated request-level replay path.
     struct=torch.zeros(15,device="cuda",dtype=next(model.parameters()).dtype);optimizer.zero_grad(set_to_none=True);long_start=time.perf_counter()
-    long_loss=tier_streaming_backward(model,multi["chunks"],struct,torch.tensor(multi["tier"],device="cuda"),pad,2048,2.,991);torch.cuda.synchronize();long_elapsed=time.perf_counter()-long_start
-    report={"budget":args.budget,"steps":used,"parameters":parameter_report(model),"batch_elapsed_seconds":elapsed,"real_tokens_per_second":total_real/elapsed,"padded_tokens_per_second":total_padded/elapsed,"padding_efficiency":total_real/total_padded,"peak_vram_bytes":torch.cuda.max_memory_allocated(),"longest_train_request_chunks":len(multi["chunks"]),"longest_request_seconds":long_elapsed,"longest_request_loss":long_loss}
+    long_loss=tier_streaming_backward(model,multi["chunks"],struct,torch.tensor(multi["tier"],device="cuda"),pad,cfg["training"]["chunk_microbatch_tokens"],2.,991);torch.cuda.synchronize();long_elapsed=time.perf_counter()-long_start
+    report={"version":cfg["version"],"num_tiers":cfg.get("num_tiers",4),"budget":args.budget,"steps":used,"parameters":parameter_report(model),"batch_elapsed_seconds":elapsed,"real_tokens_per_second":total_real/elapsed,"padded_tokens_per_second":total_padded/elapsed,"padding_efficiency":total_real/total_padded,"peak_vram_bytes":torch.cuda.max_memory_allocated(),"longest_train_request_chunks":len(multi["chunks"]),"longest_request_seconds":long_elapsed,"longest_request_loss":long_loss}
     Path(args.output).parent.mkdir(parents=True,exist_ok=True);Path(args.output).write_text(json.dumps(report,indent=2));print(json.dumps(report,indent=2))
 if __name__=="__main__":main()
