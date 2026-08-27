@@ -4,6 +4,7 @@ import json
 import os
 from typing import Callable
 from urllib.request import Request,urlopen
+from urllib.error import HTTPError
 
 from routing.models.small_llm import CombinedSmallLLMClassifier,parse_combined
 from routing.prompts.domain_tier_prompt import DOMAINS,build_combined_domain_tier_prompt
@@ -29,19 +30,32 @@ class OpenRouterCombinedClassifier(CombinedSmallLLMClassifier):
 
     def _http_transport(self,payload:dict,headers:dict[str,str])->dict:
         request=Request(self.endpoint,data=json.dumps(payload).encode(),headers=headers,method="POST")
-        with urlopen(request,timeout=self.timeout_seconds) as response:return json.loads(response.read())
+        try:
+            with urlopen(request,timeout=self.timeout_seconds) as response:return json.loads(response.read())
+        except HTTPError as error:
+            try:
+                body=json.loads(error.read())
+                message=body.get("error",{}).get("message") or str(body)
+            except Exception:message=f"HTTP {error.code}"
+            raise RuntimeError(f"OpenRouter error: {message}") from error
 
     def classify(self,request_text:str)->LLMClassification:
         api_key=os.environ.get(self.api_key_env)
         if not api_key:raise RuntimeError(f"Missing {self.api_key_env}; no OpenRouter request was sent")
-        schema={"name":"tarsiq_domain_tier","strict":True,"schema":{"type":"object","additionalProperties":False,
-                "properties":{"domain":{"type":"string","enum":list(DOMAINS)},"tier":{"type":"integer","enum":[1,2,3]}},
-                "required":["domain","tier"]}}
         payload={"model":self.model,"messages":[{"role":"user","content":build_combined_domain_tier_prompt(request_text)}],
-                 "temperature":0,"max_tokens":self.max_output_tokens,"response_format":{"type":"json_schema","json_schema":schema}}
-        response=self.transport(payload,{"Authorization":f"Bearer {api_key}","Content-Type":"application/json"})
-        try:content=response["choices"][0]["message"]["content"]
-        except (KeyError,IndexError,TypeError) as error:raise RuntimeError(f"Malformed OpenRouter response: {response}") from error
-        if not isinstance(content,str):raise RuntimeError("OpenRouter classifier content must be a JSON string")
-        parsed=parse_combined(content)
-        return LLMClassification(parsed.domain,parsed.tier,content,1)
+                 "temperature":0,"max_tokens":self.max_output_tokens,"reasoning":{"effort":"minimal","exclude":True}}
+        headers={"Authorization":f"Bearer {api_key}","Content-Type":"application/json"}
+        last_error=None
+        for attempt in range(2):
+            if attempt:
+                payload["messages"].append({"role":"assistant","content":content})
+                payload["messages"].append({"role":"user","content":"Return only the required compact JSON object. No prose or markdown."})
+            response=self.transport(payload,headers)
+            try:content=response["choices"][0]["message"]["content"]
+            except (KeyError,IndexError,TypeError) as error:raise RuntimeError(f"Malformed OpenRouter response: {response}") from error
+            if not isinstance(content,str):raise RuntimeError("OpenRouter classifier content must be a JSON string")
+            try:
+                parsed=parse_combined(content)
+                return LLMClassification(parsed.domain,parsed.tier,content,1)
+            except (ValueError,json.JSONDecodeError) as error:last_error=error
+        raise RuntimeError(f"OpenRouter returned invalid classifier JSON after retry: {last_error}")

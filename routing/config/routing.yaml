@@ -1,8 +1,8 @@
 version: routing_v2_3tier
 tier_policy: "T1=old T1; T2=old T2+old T3; T3=old T4"
-# Current testing model: Ox Alpha — free promotional pricing.
+# Current testing model: NVIDIA Nemotron 3 Ultra — free OpenRouter endpoint.
 # TODO planned paid production fallback: qwen/qwen3-30b-a3b-instruct-2507
-classifier_model: stealth/ox-alpha
+classifier_model: nvidia/nemotron-3-ultra-550b-a55b:free
 runtime:
   active_mode: llm_only
   dedicated_tier_router_enabled: false
@@ -35,7 +35,7 @@ mvp_classifier:
   endpoint: https://openrouter.ai/api/v1/chat/completions
   api_key_env: OPENROUTER_API_KEY
   timeout_seconds: 120
-  max_output_tokens: 40
+  max_output_tokens: 512
 tier_router:
   checkpoint: null
   calibration_artifact: null

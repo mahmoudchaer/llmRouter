@@ -15,8 +15,9 @@ def test_openrouter_adapter_uses_configured_model_and_schema(monkeypatch):
     result=OpenRouterCombinedClassifier("stealth/ox-alpha","TEST_OPENROUTER_KEY",transport=transport).classify("fix Python")
     assert result.domain=="code" and result.tier==2
     assert captured["payload"]["model"]=="stealth/ox-alpha"
-    schema=captured["payload"]["response_format"]["json_schema"]["schema"]
-    assert schema["properties"]["tier"]["enum"]==[1,2,3]
+    assert "response_format" not in captured["payload"]
+    assert '"tier":<integer 1-3>' in captured["payload"]["messages"][0]["content"]
+    assert captured["payload"]["reasoning"]=={"effort":"minimal","exclude":True}
     assert captured["headers"]["Authorization"]=="Bearer secret"
 
 def test_missing_api_key_fails_before_transport(monkeypatch):
@@ -27,3 +28,12 @@ def test_missing_api_key_fails_before_transport(monkeypatch):
     with pytest.raises(RuntimeError,match="Missing MISSING_OPENROUTER_KEY"):
         OpenRouterCombinedClassifier("model","MISSING_OPENROUTER_KEY",transport=transport).classify("x")
     assert not called
+
+def test_invalid_json_is_retried_once(monkeypatch):
+    monkeypatch.setenv("TEST_OPENROUTER_KEY","secret");calls=[]
+    def transport(payload,headers):
+        calls.append(len(payload["messages"]))
+        content="not json" if len(calls)==1 else '{"domain":"math","tier":3}'
+        return {"choices":[{"message":{"content":content}}]}
+    result=OpenRouterCombinedClassifier("model","TEST_OPENROUTER_KEY",transport=transport).classify("prove it")
+    assert result.domain=="math" and result.tier==3 and calls==[1,3]

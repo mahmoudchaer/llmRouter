@@ -4,7 +4,7 @@ This package combines three independent request-level signals: a constrained sma
 
 On the current Mac, the two Qwen calls may share one in-memory model instance behind a generation lock to reduce memory. They still use separate prompts, schemas, and interfaces. Set `share_model_instance: false`, or provide different hosted adapters, for true concurrent model execution.
 
-The active MVP uses one generic OpenRouter call returning both domain and tier. Its model is controlled only by `classifier_model` in `config/routing.yaml`; the adapter reads `OPENROUTER_API_KEY` and contains no model-specific behavior. Ox Alpha is the current promotional test model, while `qwen/qwen3-30b-a3b-instruct-2507` is documented as the planned paid fallback.
+The active MVP uses one generic OpenRouter call returning both domain and tier. Its model is controlled only by `classifier_model` in `config/routing.yaml`; the adapter reads `OPENROUTER_API_KEY` and contains no model-specific behavior. NVIDIA Nemotron 3 Ultra Free is the current test model, while `qwen/qwen3-30b-a3b-instruct-2507` is documented as the planned paid fallback. JSON is enforced by a strict prompt, exact parser validation, and one generic retry because the free Nemotron endpoint does not support OpenRouter `response_format` enforcement.
 
 The official three-tier semantics are empirical and preserve the frozen 60% reliability policy: T1 is old T1, T2 merges old T2/T3, and T3 is old T4. The runtime treats these as minimum capability requirements: cheap/small, capable mid-range, and strongest permitted by the customer's ceiling.
 
