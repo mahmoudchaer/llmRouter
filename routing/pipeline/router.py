@@ -7,6 +7,7 @@ from routing.schemas.model import ModelRecord
 from routing.schemas.request import RoutingRequest
 from routing.schemas.routing_result import RoutingDecision
 from routing.selection.model_selector import ModelSelector
+from routing.models.small_llm import CombinedSmallLLMClassifier
 
 
 class RuntimeRouter:
@@ -44,3 +45,25 @@ class RuntimeRouter:
         return RoutingDecision(request.request_id,domain.domain,selection.selected_capability_tier,selection.model.model_id,
                                selection.model.provider,tier_decision.policy_used,
                                f"{tier_decision.reason}; {selection.selection_reason}",audit)
+
+class LLMOnlyRuntimeRouter:
+    """Active MVP path: one constrained LLM call, then hard filters and selection."""
+    def __init__(self,classifier:CombinedSmallLLMClassifier,selector:ModelSelector,registry:list[ModelRecord]):
+        self.classifier,self.selector,self.registry=classifier,selector,registry
+
+    def route(self,request:RoutingRequest)->RoutingDecision:
+        classification=self.classifier.classify(request.task_text)
+        selection=self.selector.select(self.registry,request,classification.domain,classification.tier)
+        audit={"runtime_mode":"llm_only","domain_llm_prediction":classification.domain,
+               "llm_tier_prediction":classification.tier,"uncapped_recommended_tier":classification.tier,
+               "final_tier":selection.selected_capability_tier,
+               "customer_input_price_ceiling":request.price_ceiling.max_input_price_per_1m,
+               "customer_output_price_ceiling":request.price_ceiling.max_output_price_per_1m,
+               "eligible_models_after_constraints":selection.compatible_model_ids,
+               "capable_models":selection.capable_model_ids,"selected_model":selection.model.model_id,
+               "selected_model_capability_tier":selection.selected_capability_tier,
+               "capability_shortfall":selection.capability_shortfall,"estimated_request_cost":selection.estimated_cost,
+               "llm_chunks_classified":classification.chunks_classified}
+        return RoutingDecision(request.request_id,classification.domain,selection.selected_capability_tier,
+                               selection.model.model_id,selection.model.provider,"llm_only",
+                               selection.selection_reason,audit)

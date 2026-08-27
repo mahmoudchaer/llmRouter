@@ -1,6 +1,6 @@
 import json
 import pytest
-from routing.models.small_llm import CallableDomainClassifier,CallableTierClassifier,parse_domain,parse_tier
+from routing.models.small_llm import CallableDomainClassifier,CallableTierClassifier,parse_combined,parse_domain,parse_tier
 from routing.schemas.routing_result import DomainPrediction,LLMTierEstimate
 from routing.prompts.domain_tier_prompt import build_domain_prompt,build_tier_prompt
 
@@ -8,6 +8,8 @@ from routing.prompts.domain_tier_prompt import build_domain_prompt,build_tier_pr
 def test_strict_classification_parser():
     assert parse_domain('{"domain":"code"}').domain=="code"
     assert parse_tier('{"tier":3}').tier==3
+    combined=parse_combined('{"domain":"code","tier":2}')
+    assert combined.domain=="code" and combined.tier==2
 
 
 @pytest.mark.parametrize("text",[

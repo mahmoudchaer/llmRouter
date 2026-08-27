@@ -1,5 +1,9 @@
 version: routing_v2_3tier
 tier_policy: "T1=old T1; T2=old T2+old T3; T3=old T4"
+runtime:
+  active_mode: llm_only
+  dedicated_tier_router_enabled: false
+  preserved_optional_mode: hybrid
 domain_classifier:
   implementation: transformers_qwen
   model_id: Qwen/Qwen3-4B-Instruct-2507
@@ -23,6 +27,16 @@ llm_tier_classifier:
 local_runtime:
   share_model_instance: true
   note: separate prompts and calls share weights on Mac to reduce memory; distinct backends remain supported
+mvp_llm_classifier:
+  implementation: transformers_qwen_combined
+  model_id: Qwen/Qwen3-4B-Instruct-2507
+  revision: cdbee75f17c01a7cc42f958dc650907174af0554
+  device: auto
+  dtype: float16
+  max_new_tokens: 28
+  chunk_size_tokens: 24576
+  chunk_overlap_tokens: 256
+  do_sample: false
 tier_router:
   checkpoint: null
   calibration_artifact: null

@@ -4,8 +4,8 @@ from collections import Counter
 import json,re
 from threading import Lock
 from typing import Any,Callable
-from routing.prompts.domain_tier_prompt import DOMAINS,build_domain_prompt,build_tier_prompt
-from routing.schemas.routing_result import DomainPrediction,LLMTierEstimate
+from routing.prompts.domain_tier_prompt import DOMAINS,build_combined_domain_tier_prompt,build_domain_prompt,build_tier_prompt
+from routing.schemas.routing_result import DomainPrediction,LLMClassification,LLMTierEstimate
 
 class SmallLLMDomainClassifier(ABC):
     @abstractmethod
@@ -21,6 +21,10 @@ class SmallLLMClassifier(SmallLLMDomainClassifier,SmallLLMTierClassifier):
         domain=self.classify_domain(request_text);tier=self.classify_tier(request_text)
         from routing.schemas.routing_result import LLMClassification
         return LLMClassification(domain.domain,tier.tier,chunks_classified=max(domain.chunks_classified,tier.chunks_classified))
+
+class CombinedSmallLLMClassifier(ABC):
+    @abstractmethod
+    def classify(self,request_text:str)->LLMClassification: ...
 
 class CallableDomainClassifier(SmallLLMDomainClassifier):
     """Adapter for a local model, hosted endpoint, or future domain service."""
@@ -46,6 +50,12 @@ def parse_tier(text:str)->LLMTierEstimate:
     value=_single_json(text)
     if set(value)!={"tier"} or isinstance(value["tier"],bool) or int(value["tier"]) not in {1,2,3}:raise ValueError("Invalid constrained tier output")
     return LLMTierEstimate(int(value["tier"]),text)
+
+def parse_combined(text:str)->LLMClassification:
+    value=_single_json(text)
+    if set(value)!={"domain","tier"} or value["domain"] not in DOMAINS:raise ValueError("Invalid constrained combined output")
+    if isinstance(value["tier"],bool) or int(value["tier"]) not in {1,2,3}:raise ValueError("Invalid constrained combined output")
+    return LLMClassification(value["domain"],int(value["tier"]),text)
 
 class _TransformersQwenBase:
     def __init__(self,model_id:str,revision:str,device:str="auto",dtype:str="float16",max_new_tokens:int=20,
@@ -102,3 +112,11 @@ class TransformersQwenTierClassifier(_TransformersQwenBase,SmallLLMTierClassifie
         predictions=[parse_tier(self._generate(build_tier_prompt(chunk),allowed)) for chunk in chunks]
         if len(predictions)==1:return predictions[0]
         return LLMTierEstimate(max(p.tier for p in predictions),json.dumps([p.raw_output for p in predictions]),len(chunks))
+
+class TransformersQwenCombinedClassifier(_TransformersQwenBase,CombinedSmallLLMClassifier):
+    def classify(self,request_text:str)->LLMClassification:
+        chunks=self._chunks(request_text);allowed=[json.dumps({"domain":d,"tier":t},separators=(",",":")) for d in DOMAINS for t in range(1,4)]
+        predictions=[parse_combined(self._generate(build_combined_domain_tier_prompt(chunk),allowed)) for chunk in chunks]
+        if len(predictions)==1:return predictions[0]
+        counts=Counter(p.domain for p in predictions);domain=sorted(counts,key=lambda d:(-counts[d],DOMAINS.index(d)))[0]
+        return LLMClassification(domain,max(p.tier for p in predictions),json.dumps([p.raw_output for p in predictions]),len(chunks))

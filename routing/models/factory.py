@@ -1,6 +1,6 @@
 from __future__ import annotations
 from threading import Lock
-from routing.models.small_llm import TransformersQwenDomainClassifier,TransformersQwenTierClassifier
+from routing.models.small_llm import TransformersQwenCombinedClassifier,TransformersQwenDomainClassifier,TransformersQwenTierClassifier
 
 ARGUMENTS=("model_id","revision","device","dtype","max_new_tokens","chunk_size_tokens","chunk_overlap_tokens")
 
@@ -18,3 +18,7 @@ def build_local_llm_signals(domain_config:dict,tier_config:dict,share_model_inst
     lock=Lock();domain=TransformersQwenDomainClassifier(**_kwargs(domain_config),generation_lock=lock)
     tier=TransformersQwenTierClassifier(**_kwargs(tier_config),model=domain.model,tokenizer=domain.tokenizer,generation_lock=lock)
     return domain,tier
+
+def build_combined_llm_classifier(config:dict):
+    """Active MVP backend; replaceable with any CombinedSmallLLMClassifier implementation."""
+    return TransformersQwenCombinedClassifier(**_kwargs(config))

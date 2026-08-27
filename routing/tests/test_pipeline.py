@@ -1,10 +1,10 @@
 import time
 from routing.models.small_llm import SmallLLMDomainClassifier,SmallLLMTierClassifier
 from routing.models.tier_router import DedicatedTierRouter
-from routing.pipeline.router import RuntimeRouter
+from routing.pipeline.router import LLMOnlyRuntimeRouter,RuntimeRouter
 from routing.policies.tier_decision import TierDecisionPolicy
 from routing.schemas.request import CustomerPriceCeiling,HardRequirements,RoutingRequest
-from routing.schemas.routing_result import DomainPrediction,LLMTierEstimate,TierRouterPrediction
+from routing.schemas.routing_result import DomainPrediction,LLMClassification,LLMTierEstimate,TierRouterPrediction
 from routing.selection.model_selector import ModelSelector
 from routing.mock_registry import build_mock_registry
 
@@ -15,6 +15,8 @@ class FakeLLMTier(SmallLLMTierClassifier):
     def classify_tier(self,text):time.sleep(.08);return LLMTierEstimate(2)
 class FakeTier(DedicatedTierRouter):
     def predict(self,request):time.sleep(.08);return TierRouterPrediction(3,.55,{"T1":.10,"T2":.20,"T3":.70})
+class FakeCombined:
+    def classify(self,text):return LLMClassification("code",2)
 
 
 def test_signals_run_in_parallel_and_audit_is_complete():
@@ -35,3 +37,10 @@ def test_ceiling_shortfall_is_explicit_and_never_exceeded():
     assert result.final_tier==2 and result.selected_model=="mock/mid"
     assert result.audit["uncapped_recommended_tier"]==3
     assert result.audit["capability_shortfall"] is True
+
+def test_active_llm_only_path_does_not_call_dedicated_router():
+    result=LLMOnlyRuntimeRouter(FakeCombined(),ModelSelector(),build_mock_registry()).route(
+        RoutingRequest("mvp","fix syntax",CustomerPriceCeiling(1,3),HardRequirements(context_tokens=20)))
+    assert result.audit["runtime_mode"]=="llm_only"
+    assert "tier_router_prediction" not in result.audit
+    assert result.selected_model=="mock/mid" and result.final_tier==2

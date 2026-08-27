@@ -33,6 +33,19 @@ Return exactly one compact JSON object: {{"tier":<integer 1-3>}}. No domain and 
 REQUEST:
 {request_text}"""
 
+def build_combined_domain_tier_prompt(request_text:str)->str:
+    domains="\n".join(f"- {name}: {description}" for name,description in DOMAIN_DEFINITIONS.items())
+    return f"""Classify the request's primary domain and minimum reliable capability tier. /no_think
+Allowed domains:
+{domains}
+Domain boundaries: tool_use requires actually invoking an external tool/function/API; discussing or debugging APIs is code. Rewriting, translation, formatting, and constrained composition are instruction_following. Logic is non-mathematical reasoning or puzzles; mathematical calculations/proofs are math.
+
+{TIER_POLICY}
+Safety rule: if genuinely uncertain between adjacent tiers, choose the higher tier. Return exactly one compact JSON object with no explanation:
+{{"domain":"<allowed_domain>","tier":<integer 1-3>}}
+REQUEST:
+{request_text}"""
+
 def build_domain_tier_prompt(request_text: str) -> str:
     """Deprecated compatibility helper; runtime uses separate calls."""
     return build_domain_prompt(request_text)+"\n"+build_tier_prompt(request_text)
