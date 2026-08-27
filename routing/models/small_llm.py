@@ -75,6 +75,8 @@ class _TransformersQwenBase:
         self.model.generation_config.temperature=None;self.model.generation_config.top_p=None;self.model.generation_config.top_k=None
         self.device=next(model.parameters()).device if hasattr(model,"parameters") else device
 
+    def estimate_tokens(self,text:str)->int:return len(self.tokenizer.encode(text,add_special_tokens=False))
+
     def _chunks(self,text:str)->list[str]:
         ids=self.tokenizer.encode(text,add_special_tokens=False)
         if len(ids)<=self.chunk_size:return [text]

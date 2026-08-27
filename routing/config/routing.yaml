@@ -1,5 +1,8 @@
 version: routing_v2_3tier
 tier_policy: "T1=old T1; T2=old T2+old T3; T3=old T4"
+# Current testing model: Ox Alpha — free promotional pricing.
+# TODO planned paid production fallback: qwen/qwen3-30b-a3b-instruct-2507
+classifier_model: stealth/ox-alpha
 runtime:
   active_mode: llm_only
   dedicated_tier_router_enabled: false
@@ -27,16 +30,12 @@ llm_tier_classifier:
 local_runtime:
   share_model_instance: true
   note: separate prompts and calls share weights on Mac to reduce memory; distinct backends remain supported
-mvp_llm_classifier:
-  implementation: transformers_qwen_combined
-  model_id: Qwen/Qwen3-4B-Instruct-2507
-  revision: cdbee75f17c01a7cc42f958dc650907174af0554
-  device: auto
-  dtype: float16
-  max_new_tokens: 28
-  chunk_size_tokens: 4096
-  chunk_overlap_tokens: 128
-  do_sample: false
+mvp_classifier:
+  implementation: openrouter
+  endpoint: https://openrouter.ai/api/v1/chat/completions
+  api_key_env: OPENROUTER_API_KEY
+  timeout_seconds: 120
+  max_output_tokens: 40
 tier_router:
   checkpoint: null
   calibration_artifact: null

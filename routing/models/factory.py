@@ -1,6 +1,7 @@
 from __future__ import annotations
 from threading import Lock
 from routing.models.small_llm import TransformersQwenCombinedClassifier,TransformersQwenDomainClassifier,TransformersQwenTierClassifier
+from routing.models.openrouter import OpenRouterCombinedClassifier
 
 ARGUMENTS=("model_id","revision","device","dtype","max_new_tokens","chunk_size_tokens","chunk_overlap_tokens")
 
@@ -22,3 +23,11 @@ def build_local_llm_signals(domain_config:dict,tier_config:dict,share_model_inst
 def build_combined_llm_classifier(config:dict):
     """Active MVP backend; replaceable with any CombinedSmallLLMClassifier implementation."""
     return TransformersQwenCombinedClassifier(**_kwargs(config))
+
+def build_mvp_classifier(config:dict):
+    """Build the active classifier. Changing classifier_model is sufficient to switch OpenRouter models."""
+    backend=config["mvp_classifier"]
+    if backend["implementation"]!="openrouter":raise ValueError(f"Unsupported MVP classifier: {backend['implementation']}")
+    return OpenRouterCombinedClassifier(model=config["classifier_model"],api_key_env=backend.get("api_key_env","OPENROUTER_API_KEY"),
+        endpoint=backend.get("endpoint","https://openrouter.ai/api/v1/chat/completions"),timeout_seconds=backend.get("timeout_seconds",120),
+        max_output_tokens=backend.get("max_output_tokens",40))

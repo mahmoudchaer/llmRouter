@@ -11,7 +11,7 @@ import yaml
 
 from routing.evaluation.ensemble_eval import evaluate_tier_predictions
 from routing.mock_registry import build_mock_registry
-from routing.models.factory import build_combined_llm_classifier
+from routing.models.factory import build_mvp_classifier
 from routing.pipeline.router import LLMOnlyRuntimeRouter
 from routing.schemas.request import CustomerPriceCeiling,HardRequirements,RoutingRequest
 from routing.selection.model_selector import ModelSelector
@@ -56,11 +56,11 @@ def main()->None:
     if partial.exists():
         for line in partial.read_text().splitlines():
             if line.strip():row=json.loads(line);completed[str(row["prompt_id"])]=row
-    classifier=build_combined_llm_classifier(cfg["mvp_llm_classifier"]);registry=build_mock_registry();selector=ModelSelector();router=LLMOnlyRuntimeRouter(classifier,selector,registry)
+    classifier=build_mvp_classifier(cfg);registry=build_mock_registry();selector=ModelSelector();router=LLMOnlyRuntimeRouter(classifier,selector,registry)
     ceiling=CustomerPriceCeiling(1,3)
     for i,row in enumerate(data.itertuples(),1):
         if str(row.prompt_id) in completed:continue
-        context_tokens=max(1,len(classifier.tokenizer.encode(str(row.prompt),add_special_tokens=False)))
+        context_tokens=classifier.estimate_tokens(str(row.prompt))
         if context_tokens>args.max_eval_tokens:
             result={"prompt_id":str(row.prompt_id),"source_dataset":row.source_dataset,"true_domain":row.domain,
                     "true_tier":None if pd.isna(row.tier) else int(row.tier),"predicted_domain":None,"predicted_tier":None,
@@ -88,7 +88,8 @@ def main()->None:
     predictions["evaluation_status"]=predictions.evaluation_status.fillna("completed")
     predictions.to_parquet(output/"predictions.parquet",index=False)
     metrics=evaluate_rows(predictions);(output/"metrics.json").write_text(json.dumps(metrics,indent=2)+"\n")
-    (output/"route_config.json").write_text(json.dumps(cfg["mvp_llm_classifier"],indent=2)+"\n");print(json.dumps(metrics,indent=2))
+    public_config={"classifier_model":cfg["classifier_model"],**cfg["mvp_classifier"]}
+    (output/"route_config.json").write_text(json.dumps(public_config,indent=2)+"\n");print(json.dumps(metrics,indent=2))
 
 
 if __name__=="__main__":main()
