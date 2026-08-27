@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 from http.server import SimpleHTTPRequestHandler,ThreadingHTTPServer
+import os
 from pathlib import Path
 import sys
 
@@ -19,6 +20,16 @@ from routing.selection.model_selector import ModelSelector
 
 
 _router=None
+
+
+def load_root_env()->None:
+    path=ROOT/".env"
+    if not path.exists():return
+    for raw in path.read_text().splitlines():
+        line=raw.strip()
+        if not line or line.startswith("#") or "=" not in line:continue
+        key,value=line.split("=",1);key=key.strip();value=value.strip().strip('"').strip("'")
+        if key:os.environ.setdefault(key,value)
 
 
 def get_router():
@@ -55,6 +66,7 @@ class Handler(SimpleHTTPRequestHandler):
 
 
 if __name__=="__main__":
+    load_root_env()
     host,port="127.0.0.1",8787
     print(f"Tarsiq preview: http://{host}:{port}")
     ThreadingHTTPServer((host,port),Handler).serve_forever()

@@ -48,3 +48,6 @@ wandb/
 # OS/editor files
 .DS_Store
 *.swp
+.env
+.env.*
+!.env.example
