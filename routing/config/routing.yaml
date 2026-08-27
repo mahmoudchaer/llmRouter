@@ -1,0 +1,35 @@
+version: routing_v1
+domain_classifier:
+  implementation: transformers_qwen
+  model_id: Qwen/Qwen3-1.7B
+  revision: 70d244cc86ccca08cf5af4e1e306ecf908b1ad5e
+  device: auto
+  dtype: float16
+  max_new_tokens: 20
+  chunk_size_tokens: 24576
+  chunk_overlap_tokens: 256
+  do_sample: false
+llm_tier_classifier:
+  implementation: transformers_qwen
+  model_id: Qwen/Qwen3-1.7B
+  revision: 70d244cc86ccca08cf5af4e1e306ecf908b1ad5e
+  device: auto
+  dtype: float16
+  max_new_tokens: 20
+  chunk_size_tokens: 24576
+  chunk_overlap_tokens: 256
+  do_sample: false
+local_runtime:
+  share_model_instance: true
+  note: separate prompts and calls share weights on Mac to reduce memory; distinct backends remain supported
+tier_router:
+  checkpoint: null
+  calibration_artifact: null
+decision_policy:
+  high_confidence: 0.85
+  low_confidence: 0.60
+  large_disagreement_tiers: 2
+  allow_high_confidence_downward_disagreement: false
+  thresholds_are_provisional_until_calibrated: true
+selection:
+  no_suitable_model_behavior: error
