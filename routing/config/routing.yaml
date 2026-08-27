@@ -34,8 +34,8 @@ mvp_llm_classifier:
   device: auto
   dtype: float16
   max_new_tokens: 28
-  chunk_size_tokens: 24576
-  chunk_overlap_tokens: 256
+  chunk_size_tokens: 4096
+  chunk_overlap_tokens: 128
   do_sample: false
 tier_router:
   checkpoint: null

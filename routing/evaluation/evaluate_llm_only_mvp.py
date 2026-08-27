@@ -27,15 +27,18 @@ def domain_metrics(frame:pd.DataFrame)->dict:
 
 
 def evaluate_rows(frame:pd.DataFrame)->dict:
-    resolved=frame[frame.true_tier.notna()].copy()
+    evaluated=frame[frame.evaluation_status.eq("completed")].copy()
+    skipped=frame[~frame.evaluation_status.eq("completed")].copy()
+    resolved=evaluated[evaluated.true_tier.notna()].copy()
     tier=evaluate_tier_predictions(resolved.true_tier.astype(int),resolved.predicted_tier.astype(int))
-    baseline=frame.baseline_ceiling_cost.to_numpy();actual=frame.estimated_cost.to_numpy()
+    baseline=evaluated.baseline_ceiling_cost.to_numpy();actual=evaluated.estimated_cost.to_numpy()
     valid=baseline>0
-    return {"n":len(frame),"resolved_tier_n":len(resolved),"domain":domain_metrics(frame),"tier":tier,
-            "latency":{"mean_seconds":float(frame.latency_seconds.mean()),"median_seconds":float(frame.latency_seconds.median()),
-                       "p95_seconds":float(frame.latency_seconds.quantile(.95)),"throughput_requests_per_second":float(len(frame)/frame.latency_seconds.sum())},
-            "selection":{"selected_model_counts":frame.selected_model.value_counts().to_dict(),
-                         "capability_shortfall_count":int(frame.capability_shortfall.sum()),
+    return {"n":len(frame),"evaluated_n":len(evaluated),"skipped_n":len(skipped),
+            "skipped_by_reason":skipped.evaluation_status.value_counts().to_dict(),"resolved_tier_n":len(resolved),"domain":domain_metrics(evaluated),"tier":tier,
+            "latency":{"mean_seconds":float(evaluated.latency_seconds.mean()),"median_seconds":float(evaluated.latency_seconds.median()),
+                       "p95_seconds":float(evaluated.latency_seconds.quantile(.95)),"throughput_requests_per_second":float(len(evaluated)/evaluated.latency_seconds.sum())},
+            "selection":{"selected_model_counts":evaluated.selected_model.value_counts().to_dict(),
+                         "capability_shortfall_count":int(evaluated.capability_shortfall.sum()),
                          "mean_estimated_cost":float(actual.mean()),
                          "mean_savings_fraction_vs_strongest_permitted":float(np.mean(1-actual[valid]/baseline[valid])) if valid.any() else None}}
 
@@ -44,7 +47,7 @@ def main()->None:
     parser=argparse.ArgumentParser();parser.add_argument("--subset",default="training/reports/domain_router_eval/subset.parquet")
     parser.add_argument("--labels",default="data_pipeline/output/three_tier/final_labeled_dataset_3tier.parquet")
     parser.add_argument("--config",default="routing/config/routing.yaml");parser.add_argument("--output-dir",default="routing/reports/llm_only_mvp")
-    parser.add_argument("--max-prompts",type=int);parser.add_argument("--fresh",action="store_true");args=parser.parse_args()
+    parser.add_argument("--max-prompts",type=int);parser.add_argument("--max-eval-tokens",type=int,default=8192);parser.add_argument("--fresh",action="store_true");args=parser.parse_args()
     cfg=yaml.safe_load(open(args.config));subset=pd.read_parquet(args.subset);labels=pd.read_parquet(args.labels)[["prompt_id","tier","resolved"]]
     data=subset.merge(labels,on="prompt_id",how="left");data=data.iloc[:args.max_prompts] if args.max_prompts else data
     output=Path(args.output_dir);output.mkdir(parents=True,exist_ok=True);partial=output/"predictions.jsonl"
@@ -58,6 +61,15 @@ def main()->None:
     for i,row in enumerate(data.itertuples(),1):
         if str(row.prompt_id) in completed:continue
         context_tokens=max(1,len(classifier.tokenizer.encode(str(row.prompt),add_special_tokens=False)))
+        if context_tokens>args.max_eval_tokens:
+            result={"prompt_id":str(row.prompt_id),"source_dataset":row.source_dataset,"true_domain":row.domain,
+                    "true_tier":None if pd.isna(row.tier) else int(row.tier),"predicted_domain":None,"predicted_tier":None,
+                    "final_tier":None,"selected_model":None,"capability_shortfall":None,"estimated_cost":None,
+                    "baseline_ceiling_cost":None,"latency_seconds":None,"chunks_classified":None,
+                    "input_tokens":context_tokens,"evaluation_status":"skipped_too_slow_long_input"}
+            with partial.open("a") as handle:handle.write(json.dumps(result)+"\n")
+            completed[result["prompt_id"]]=result
+            continue
         request=RoutingRequest(str(row.prompt_id),str(row.prompt),ceiling,HardRequirements(context_tokens=context_tokens),expected_output_tokens=512)
         started=time.perf_counter();decision=router.route(request);latency=time.perf_counter()-started
         baseline=selector.select(registry,request,decision.domain,3)
@@ -66,11 +78,15 @@ def main()->None:
                 "predicted_tier":decision.audit["llm_tier_prediction"],"final_tier":decision.final_tier,
                 "selected_model":decision.selected_model,"capability_shortfall":decision.audit["capability_shortfall"],
                 "estimated_cost":decision.audit["estimated_request_cost"],"baseline_ceiling_cost":baseline.estimated_cost,
-                "latency_seconds":latency,"chunks_classified":decision.audit["llm_chunks_classified"]}
+                "latency_seconds":latency,"chunks_classified":decision.audit["llm_chunks_classified"],
+                "input_tokens":context_tokens,"evaluation_status":"completed"}
         with partial.open("a") as handle:handle.write(json.dumps(result)+"\n")
         completed[result["prompt_id"]]=result
         if len(completed)%10==0:print(f"{len(completed)}/{len(data)}",flush=True)
-    predictions=pd.DataFrame([completed[str(pid)] for pid in data.prompt_id]);predictions.to_parquet(output/"predictions.parquet",index=False)
+    predictions=pd.DataFrame([completed[str(pid)] for pid in data.prompt_id])
+    if "evaluation_status" not in predictions:predictions["evaluation_status"]="completed"
+    predictions["evaluation_status"]=predictions.evaluation_status.fillna("completed")
+    predictions.to_parquet(output/"predictions.parquet",index=False)
     metrics=evaluate_rows(predictions);(output/"metrics.json").write_text(json.dumps(metrics,indent=2)+"\n")
     (output/"route_config.json").write_text(json.dumps(cfg["mvp_llm_classifier"],indent=2)+"\n");print(json.dumps(metrics,indent=2))
 
