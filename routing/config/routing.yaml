@@ -1,8 +1,8 @@
 version: routing_v1
 domain_classifier:
   implementation: transformers_qwen
-  model_id: Qwen/Qwen3-1.7B
-  revision: 70d244cc86ccca08cf5af4e1e306ecf908b1ad5e
+  model_id: Qwen/Qwen3-4B-Instruct-2507
+  revision: cdbee75f17c01a7cc42f958dc650907174af0554
   device: auto
   dtype: float16
   max_new_tokens: 20
@@ -11,8 +11,8 @@ domain_classifier:
   do_sample: false
 llm_tier_classifier:
   implementation: transformers_qwen
-  model_id: Qwen/Qwen3-1.7B
-  revision: 70d244cc86ccca08cf5af4e1e306ecf908b1ad5e
+  model_id: Qwen/Qwen3-4B-Instruct-2507
+  revision: cdbee75f17c01a7cc42f958dc650907174af0554
   device: auto
   dtype: float16
   max_new_tokens: 20

@@ -4,6 +4,8 @@ This package combines three independent request-level signals: a constrained sma
 
 On the current Mac, the two Qwen calls may share one in-memory model instance behind a generation lock to reduce memory. They still use separate prompts, schemas, and interfaces. Set `share_model_instance: false`, or provide different hosted adapters, for true concurrent model execution.
 
+The local default is pinned to `Qwen/Qwen3-4B-Instruct-2507` at revision `cdbee75f17c01a7cc42f958dc650907174af0554`. The domain and tier classifiers share this local model instance by default but remain independent calls.
+
 The official tier semantics are empirical. T1–T4 represent the lowest domain-specific capability group whose core models reached the frozen 60% reliability threshold. The runtime does not reinterpret tiers as generic easy/medium/hard labels.
 
 ## Safety invariants
