@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Tarsiq Router Preview</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <main class="shell">
+    <header>
+      <div class="brand"><span class="mark">T</span><span>Tarsiq</span></div>
+      <span class="status"><i></i> Router preview</span>
+    </header>
+
+    <section class="hero">
+      <p class="eyebrow">MODEL ROUTING, EXPLAINED</p>
+      <h1>Send a request.<br><span>See where it routes.</span></h1>
+      <p class="sub">Tarsiq predicts the request domain and minimum capability tier, then selects the cheapest suitable model within your price ceiling.</p>
+    </section>
+
+    <section class="workspace">
+      <form id="router-form" class="composer">
+        <label for="prompt">Request</label>
+        <textarea id="prompt" placeholder="Paste a prompt, coding task, math problem, or customer request…" required></textarea>
+        <div class="controls">
+          <label>Max input / 1M <span>$<input id="input-price" type="number" min="0" step="0.01" value="1.00"></span></label>
+          <label>Max output / 1M <span>$<input id="output-price" type="number" min="0" step="0.01" value="3.00"></span></label>
+          <label class="check"><input id="tools" type="checkbox"> Needs tools</label>
+          <label class="check"><input id="structured" type="checkbox"> Structured output</label>
+        </div>
+        <button id="submit" type="submit"><span>Route request</span><b>→</b></button>
+        <p id="error" class="error" hidden></p>
+      </form>
+
+      <aside id="result" class="result empty">
+        <div class="empty-state"><div class="radar">◎</div><p>Your routing prediction will appear here.</p></div>
+        <div class="result-content" hidden>
+          <p class="eyebrow">ROUTING DECISION</p>
+          <div class="prediction-grid">
+            <article><small>DOMAIN</small><strong id="domain">—</strong></article>
+            <article><small>CAPABILITY</small><strong id="tier">—</strong></article>
+          </div>
+          <div class="model-card"><small>SELECTED MODEL</small><h2 id="model">—</h2><p id="provider">—</p></div>
+          <div class="details">
+            <div><span>Classifier estimate</span><b id="raw-tier">—</b></div>
+            <div><span>Price ceiling</span><b id="ceiling">—</b></div>
+            <div><span>Eligible models</span><b id="eligible">—</b></div>
+          </div>
+          <p id="reason" class="reason"></p>
+        </div>
+      </aside>
+    </section>
+  </main>
+  <script src="app.js"></script>
+</body>
+</html>
