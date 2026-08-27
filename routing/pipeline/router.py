@@ -31,14 +31,16 @@ class RuntimeRouter:
             "tier_router_prediction":dedicated.tier,"tier_router_confidence":dedicated.confidence,
             "tier_router_probabilities":dedicated.probabilities,"tier_disagreement":tier_decision.disagreement,
             "decision_policy_used":tier_decision.policy_used,"uncapped_recommended_tier":tier_decision.tier,
-            "final_tier":tier_decision.tier,
+            "final_tier":selection.selected_capability_tier,
             "customer_input_price_ceiling":request.price_ceiling.max_input_price_per_1m,
             "customer_output_price_ceiling":request.price_ceiling.max_output_price_per_1m,
             "eligible_models_after_constraints":selection.compatible_model_ids,
             "capable_models":selection.capable_model_ids,"selected_model":selection.model.model_id,
+            "capability_shortfall":selection.capability_shortfall,
+            "selected_model_capability_tier":selection.selected_capability_tier,
             "estimated_request_cost":selection.estimated_cost,"domain_chunks_classified":domain.chunks_classified,
             "llm_tier_chunks_classified":llm_tier.chunks_classified,
         }
-        return RoutingDecision(request.request_id,domain.domain,tier_decision.tier,selection.model.model_id,
+        return RoutingDecision(request.request_id,domain.domain,selection.selected_capability_tier,selection.model.model_id,
                                selection.model.provider,tier_decision.policy_used,
-                               f"{tier_decision.reason}; cheapest compatible model meeting capability tier",audit)
+                               f"{tier_decision.reason}; {selection.selection_reason}",audit)

@@ -32,5 +32,10 @@ decision_policy:
   large_disagreement_tiers: 2
   allow_high_confidence_downward_disagreement: false
   thresholds_are_provisional_until_calibrated: true
+  calibration_safety_target:
+    max_under_routing: 0.10
+    max_severe_under_routing: 0.02
+    min_examples: 50
 selection:
   no_suitable_model_behavior: error
+  capability_shortfall_behavior: strongest_eligible_within_hard_ceiling

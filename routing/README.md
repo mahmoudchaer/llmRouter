@@ -11,10 +11,12 @@ The official three-tier semantics are empirical and preserve the frozen 60% reli
 ## Safety invariants
 
 - Price ceilings and compatibility requirements are hard filters.
-- No model below the final required capability tier is silently selected.
+- If the requested tier is unavailable inside the customer's hard ceiling, the configurable fallback selects the strongest compatible model inside that ceiling and emits `capability_shortfall=true`; it never downgrades silently.
 - Disagreement defaults upward; any downward override requires calibrated configuration.
 - Full prompts are not logged by the runtime decision object.
 - Long small-LLM inputs are chunked with overlap and conservatively aggregated; they are not silently truncated.
 - Confidence thresholds in `config/routing.yaml` remain provisional until generated from validation predictions.
 
 The dedicated checkpoint path intentionally remains null until the seed-17 study selects its final model.
+
+Validation predictions can be converted into confidence-bucket and cumulative-threshold calibration artifacts. A trust threshold is recommended only when it has enough examples and satisfies configured under-routing and severe-under-routing limits; until then, the thresholds remain provisional.

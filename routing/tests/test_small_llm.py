@@ -1,6 +1,7 @@
 import json
 import pytest
-from routing.models.small_llm import parse_domain,parse_tier
+from routing.models.small_llm import CallableDomainClassifier,CallableTierClassifier,parse_domain,parse_tier
+from routing.schemas.routing_result import DomainPrediction,LLMTierEstimate
 from routing.prompts.domain_tier_prompt import build_domain_prompt,build_tier_prompt
 
 
@@ -23,3 +24,7 @@ def test_prompt_uses_frozen_empirical_policy():
     assert '{"domain":"<allowed_domain>"}' in domain_prompt and "Frozen empirical tier policy" not in domain_prompt
     assert "at least 60%" in tier_prompt and "minimum domain-specific model-capability group" in tier_prompt
     assert '{"tier":<integer 1-3>}' in tier_prompt and "Allowed domains" not in tier_prompt
+
+def test_llm_backends_are_swappable_independently():
+    domain=CallableDomainClassifier(lambda _:DomainPrediction("math"));tier=CallableTierClassifier(lambda _:LLMTierEstimate(2))
+    assert domain.classify_domain("x").domain=="math" and tier.classify_tier("x").tier==2

@@ -27,3 +27,11 @@ def test_signals_run_in_parallel_and_audit_is_complete():
                 "tier_router_probabilities","decision_policy_used","eligible_models_after_constraints",
                 "customer_input_price_ceiling","selected_model"]:
         assert key in result.audit
+
+def test_ceiling_shortfall_is_explicit_and_never_exceeded():
+    router=RuntimeRouter(FakeDomain(),FakeLLMTier(),FakeTier(),TierDecisionPolicy(),ModelSelector(),build_mock_registry())
+    req=RoutingRequest("x","debug this race",CustomerPriceCeiling(.21,.61),HardRequirements(context_tokens=1000))
+    result=router.route(req)
+    assert result.final_tier==2 and result.selected_model=="mock/mid"
+    assert result.audit["uncapped_recommended_tier"]==3
+    assert result.audit["capability_shortfall"] is True

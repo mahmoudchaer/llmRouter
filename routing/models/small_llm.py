@@ -3,7 +3,7 @@ from abc import ABC,abstractmethod
 from collections import Counter
 import json,re
 from threading import Lock
-from typing import Any
+from typing import Any,Callable
 from routing.prompts.domain_tier_prompt import DOMAINS,build_domain_prompt,build_tier_prompt
 from routing.schemas.routing_result import DomainPrediction,LLMTierEstimate
 
@@ -21,6 +21,16 @@ class SmallLLMClassifier(SmallLLMDomainClassifier,SmallLLMTierClassifier):
         domain=self.classify_domain(request_text);tier=self.classify_tier(request_text)
         from routing.schemas.routing_result import LLMClassification
         return LLMClassification(domain.domain,tier.tier,chunks_classified=max(domain.chunks_classified,tier.chunks_classified))
+
+class CallableDomainClassifier(SmallLLMDomainClassifier):
+    """Adapter for a local model, hosted endpoint, or future domain service."""
+    def __init__(self,classifier:Callable[[str],DomainPrediction]):self.classifier=classifier
+    def classify_domain(self,request_text:str)->DomainPrediction:return self.classifier(request_text)
+
+class CallableTierClassifier(SmallLLMTierClassifier):
+    """Adapter for an independent LLM tier backend without coupling orchestration to Qwen."""
+    def __init__(self,classifier:Callable[[str],LLMTierEstimate]):self.classifier=classifier
+    def classify_tier(self,request_text:str)->LLMTierEstimate:return self.classifier(request_text)
 
 def _single_json(text:str)->dict:
     matches=re.findall(r"\{[^{}]*\}",text,flags=re.DOTALL)

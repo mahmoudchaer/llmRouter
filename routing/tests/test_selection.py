@@ -17,8 +17,13 @@ def test_selects_cheapest_capable_compatible_model():
 
 
 def test_price_ceiling_is_hard_and_never_exceeded():
+    result=ModelSelector().select(build_mock_registry(),request(CustomerPriceCeiling(.21,.61)),"code",3)
+    assert result.model.model_id=="mock/mid" and result.capability_shortfall
+    assert result.selected_capability_tier==2 and result.model.input_price_per_1m<=.21
+
+def test_strict_selector_can_reject_capability_shortfall():
     with pytest.raises(NoSuitableModelError):
-        ModelSelector().select(build_mock_registry(),request(CustomerPriceCeiling(.21,.61)),"code",3)
+        ModelSelector(False).select(build_mock_registry(),request(CustomerPriceCeiling(.21,.61)),"code",3)
 
 
 def test_reference_ceiling_is_price_snapshot():
