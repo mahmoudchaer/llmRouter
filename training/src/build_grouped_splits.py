@@ -9,7 +9,7 @@ def semantic_domain(df: pd.DataFrame) -> pd.Series:
     return df["component"].replace({"logic_arc_agi": "logic", "logic_classic": "logic"})
 
 
-def _score_assignment(summary, assignment, total, global_domain, target=(.70, .15, .15)):
+def _score_assignment(summary, assignment, total, global_domain, num_tiers, target=(.70, .15, .15)):
     loss = 0.0
     for split, frac in zip(("train", "validation", "test"), target):
         names=[g for g,b in assignment.items() if b==split]
@@ -19,7 +19,7 @@ def _score_assignment(summary, assignment, total, global_domain, target=(.70, .1
         part_domain=part[global_domain.index]/max(n,1)
         loss += (global_domain-part_domain).abs().mean()
         if split=="train":
-            if (part[[f"tier_{i}" for i in range(1,5)]]>0).sum()<4: return np.inf
+            if (part[[f"tier_{i}" for i in range(1,num_tiers+1)]]>0).sum()<num_tiers: return np.inf
             if (part[global_domain.index]>0).sum()<7: return np.inf
     return float(loss)
 
@@ -33,7 +33,8 @@ def controlled_group_split(df: pd.DataFrame, seed: int, iterations: int = 5000):
     summary=pd.DataFrame(index=groups)
     summary["n"]=sizes
     for d in domains: summary[d]=temp[temp.semantic_domain==d].source_dataset.value_counts().reindex(groups,fill_value=0)
-    for i in range(1,5): summary[f"tier_{i}"]=temp[temp.resolved & (temp.tier==i)].source_dataset.value_counts().reindex(groups,fill_value=0)
+    num_tiers=int(temp.loc[temp.resolved,"tier"].max())
+    for i in range(1,num_tiers+1): summary[f"tier_{i}"]=temp[temp.resolved & (temp.tier==i)].source_dataset.value_counts().reindex(groups,fill_value=0)
     global_domain=temp.semantic_domain.value_counts(normalize=True).reindex(domains)
     candidates = []
     for _ in range(iterations):
@@ -48,7 +49,7 @@ def controlled_group_split(df: pd.DataFrame, seed: int, iterations: int = 5000):
             bucket_candidates = sorted(buckets, key=lambda b: counts[b] / targets[b])
             b = bucket_candidates[0]; buckets[b].append(g); counts[b] += sizes[g]
         assignment = {g: b for b, gs in buckets.items() for g in gs}
-        score = _score_assignment(summary, assignment, len(df), global_domain)
+        score = _score_assignment(summary, assignment, len(df), global_domain, num_tiers)
         if np.isfinite(score): candidates.append((score, assignment))
     if not candidates: raise RuntimeError("No viable source-isolated split found")
     unique={tuple(sorted(a.items())):(s,a) for s,a in candidates}

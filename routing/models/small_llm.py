@@ -34,7 +34,7 @@ def parse_domain(text:str)->DomainPrediction:
 
 def parse_tier(text:str)->LLMTierEstimate:
     value=_single_json(text)
-    if set(value)!={"tier"} or isinstance(value["tier"],bool) or int(value["tier"]) not in {1,2,3,4}:raise ValueError("Invalid constrained tier output")
+    if set(value)!={"tier"} or isinstance(value["tier"],bool) or int(value["tier"]) not in {1,2,3}:raise ValueError("Invalid constrained tier output")
     return LLMTierEstimate(int(value["tier"]),text)
 
 class _TransformersQwenBase:
@@ -88,7 +88,7 @@ class TransformersQwenDomainClassifier(_TransformersQwenBase,SmallLLMDomainClass
 
 class TransformersQwenTierClassifier(_TransformersQwenBase,SmallLLMTierClassifier):
     def classify_tier(self,request_text:str)->LLMTierEstimate:
-        chunks=self._chunks(request_text);allowed=[json.dumps({"tier":t},separators=(",",":")) for t in range(1,5)]
+        chunks=self._chunks(request_text);allowed=[json.dumps({"tier":t},separators=(",",":")) for t in range(1,4)]
         predictions=[parse_tier(self._generate(build_tier_prompt(chunk),allowed)) for chunk in chunks]
         if len(predictions)==1:return predictions[0]
         return LLMTierEstimate(max(p.tier for p in predictions),json.dumps([p.raw_output for p in predictions]),len(chunks))

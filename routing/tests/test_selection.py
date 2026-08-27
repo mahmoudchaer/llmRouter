@@ -13,7 +13,7 @@ def request(ceiling=CustomerPriceCeiling(1,3),requirements=HardRequirements(cont
 
 def test_selects_cheapest_capable_compatible_model():
     result=ModelSelector().select(build_mock_registry(),request(),"code",3)
-    assert result.model.model_id=="mock/strong"
+    assert result.model.model_id=="mock/frontier"
 
 
 def test_price_ceiling_is_hard_and_never_exceeded():
@@ -33,4 +33,3 @@ def test_all_hard_filters_are_enforced():
         provider_blocklist=frozenset({"mock"}),model_blocklist=frozenset({model.model_id})))
     reasons=compatibility_reasons(model,req)
     assert {"context_window","input_modalities","provider_blocklist","model_blocklist"}<=set(reasons)
-

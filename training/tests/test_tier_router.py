@@ -7,16 +7,31 @@ def test_cumulative_targets():
     got=tiers_to_cumulative(torch.tensor([0,1,2,3]))
     assert got.tolist()==[[0,0,0],[1,0,0],[1,1,0],[1,1,1]]
 
+def test_three_tier_cumulative_targets():
+    got=tiers_to_cumulative(torch.tensor([0,1,2]),3)
+    assert got.tolist()==[[0,0],[1,0],[1,1]]
+
 def test_monotonic_logits_and_valid_class_probabilities():
     head=MonotonicOrdinalHead(5);logits=head(torch.randn(12,5))
     assert torch.all(logits[:,0]>=logits[:,1]) and torch.all(logits[:,1]>=logits[:,2])
     p=cumulative_probabilities(logits)
     assert torch.all(p>=0) and torch.allclose(p.sum(1),torch.ones(12),atol=1e-6)
 
+def test_three_tier_ordered_cutpoints_and_probabilities():
+    head=MonotonicOrdinalHead(5,3);logits=head(torch.randn(12,5))
+    assert logits.shape==(12,2) and torch.all(logits[:,0]>=logits[:,1])
+    p=cumulative_probabilities(logits)
+    assert p.shape==(12,3) and torch.all(p>=0) and torch.allclose(p.sum(1),torch.ones(12),atol=1e-6)
+
 def test_under_route_weight_increases_false_negative_loss():
     logits=torch.tensor([[-3.,-3.,-3.]])
     tier4=torch.tensor([3])
     assert cumulative_ordinal_loss(logits,tier4,3)>cumulative_ordinal_loss(logits,tier4,1)
+
+def test_three_tier_under_route_weight_increases_false_negative_loss():
+    logits=torch.tensor([[-3.,-3.]])
+    tier3=torch.tensor([2])
+    assert cumulative_ordinal_loss(logits,tier3,3)>cumulative_ordinal_loss(logits,tier3,1)
 
 class ToyEncoder(torch.nn.Module):
     def __init__(self):super().__init__();self.emb=torch.nn.Embedding(20,8)

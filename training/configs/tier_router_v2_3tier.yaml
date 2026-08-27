@@ -1,9 +1,10 @@
-version: tier_router_v1
-num_tiers: 4
+version: tier_router_v2_3tier
+num_tiers: 3
+label_policy: "New T1=Old T1; New T2=Old T2+Old T3; New T3=Old T4"
 artifacts:
-  dataset: data/final_labeled_dataset.parquet
-  cache: cache/tier_router_v1_seed17.pkl
-  output_root: output/tier_router_v1
+  dataset: data/final_labeled_dataset_3tier.parquet
+  cache: cache/tier_router_v2_3tier_seed17.pkl
+  output_root: output/tier_router_v2_3tier
 model:
   model_id: Qwen/Qwen3-Embedding-4B
   revision: 5cf2132abc99cad020ac570b19d031efec650f2b
@@ -32,8 +33,7 @@ training:
   epochs: 3
   gradient_clip_norm: 1.0
   gradient_checkpointing: true
-  single_chunk_batch_token_budget: 2048
-  single_chunk_batch_token_budget_candidates: [2048, 4096, 8192, 16384]
+  single_chunk_batch_token_budget: 8192
   chunk_microbatch_tokens: 2048
 losses:
   experiments:
@@ -42,14 +42,13 @@ losses:
     ordinal_asymmetric: {kind: cumulative_ordinal, under_route_weight_grid: [2.0, 3.0, 5.0]}
 selection:
   lower_is_better: true
-  score: 0.35*(mae/3)+0.35*severe_under_routing+0.20*under_routing+0.10*(1-macro_f1)
+  score: 0.35*(mae/2)+0.35*severe_under_routing+0.20*under_routing+0.10*(1-macro_f1)
 evaluation_cost_matrix:
-  description: under-routing uses squared tier distance; over-routing uses 0.25 times distance; normalized by maximum cost 9
+  description: "Under-routing cost is squared tier distance; over-routing cost is 0.25 times distance; normalized by maximum cost 4."
   matrix:
-    - [0.0, 0.25, 0.50, 0.75]
-    - [1.0, 0.0, 0.25, 0.50]
-    - [4.0, 1.0, 0.0, 0.25]
-    - [9.0, 4.0, 1.0, 0.0]
+    - [0.0, 0.25, 0.50]
+    - [1.0, 0.0, 0.25]
+    - [4.0, 1.0, 0.0]
 splits:
   seeds: [17, 29, 43, 71, 101]
   primary_pattern: splits/grouped_split_{seed}.json

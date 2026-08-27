@@ -19,8 +19,8 @@ class LLMTierEstimate:
     chunks_classified: int = 1
 
     def __post_init__(self) -> None:
-        if self.tier not in {1, 2, 3, 4}:
-            raise ValueError("tier must be in 1..4")
+        if self.tier not in {1, 2, 3}:
+            raise ValueError("tier must be in 1..3")
 
 
 @dataclass(frozen=True)
@@ -32,7 +32,7 @@ class LLMClassification:
     chunks_classified: int = 1
 
     def __post_init__(self) -> None:
-        if self.tier not in {1,2,3,4}: raise ValueError("tier must be in 1..4")
+        if self.tier not in {1,2,3}: raise ValueError("tier must be in 1..3")
 
 
 @dataclass(frozen=True)
@@ -43,13 +43,13 @@ class TierRouterPrediction:
     calibration_version: str | None = None
 
     def __post_init__(self) -> None:
-        if self.tier not in {1, 2, 3, 4}:
-            raise ValueError("tier must be in 1..4")
+        if self.tier not in {1, 2, 3}:
+            raise ValueError("tier must be in 1..3")
         if not 0 <= self.confidence <= 1:
             raise ValueError("confidence must be in [0,1]")
-        expected = {"T1", "T2", "T3", "T4"}
+        expected = {"T1", "T2", "T3"}
         if set(self.probabilities) != expected:
-            raise ValueError("probabilities must contain T1..T4")
+            raise ValueError("probabilities must contain T1..T3")
         if abs(sum(self.probabilities.values()) - 1.0) > 1e-4:
             raise ValueError("probabilities must sum to 1")
 

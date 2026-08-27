@@ -5,7 +5,7 @@ from routing.schemas.routing_result import LLMTierEstimate,TierRouterPrediction
 
 
 def dedicated(tier,confidence):
-    probs={f"T{i}":0.0 for i in range(1,5)};probs[f"T{tier}"]=1.0
+    probs={f"T{i}":0.0 for i in range(1,4)};probs[f"T{tier}"]=1.0
     return TierRouterPrediction(tier,confidence,probs)
 
 

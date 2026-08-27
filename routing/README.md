@@ -6,7 +6,7 @@ On the current Mac, the two Qwen calls may share one in-memory model instance be
 
 The local default is pinned to `Qwen/Qwen3-4B-Instruct-2507` at revision `cdbee75f17c01a7cc42f958dc650907174af0554`. The domain and tier classifiers share this local model instance by default but remain independent calls.
 
-The official tier semantics are empirical. T1–T4 represent the lowest domain-specific capability group whose core models reached the frozen 60% reliability threshold. The runtime does not reinterpret tiers as generic easy/medium/hard labels.
+The official three-tier semantics are empirical and preserve the frozen 60% reliability policy: T1 is old T1, T2 merges old T2/T3, and T3 is old T4. The runtime treats these as minimum capability requirements: cheap/small, capable mid-range, and strongest permitted by the customer's ceiling.
 
 ## Safety invariants
 

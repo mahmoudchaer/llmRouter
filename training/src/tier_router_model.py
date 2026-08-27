@@ -5,10 +5,10 @@ from .hierarchical_router_model import last_non_padding,MeanAggregator
 from .tier_ordinal import MonotonicOrdinalHead,cumulative_ordinal_loss
 
 class TierRouter(nn.Module):
-    def __init__(self,encoder,hidden_size,loss_kind="ordinal",structural_dim=15,dropout=.1):
+    def __init__(self,encoder,hidden_size,loss_kind="ordinal",structural_dim=15,dropout=.1,num_tiers=4):
         super().__init__();self.encoder=encoder;self.structural_dim=structural_dim;self.aggregator=MeanAggregator();dim=hidden_size+structural_dim
-        self.request_norm=nn.LayerNorm(dim);self.dropout=nn.Dropout(dropout);self.loss_kind=loss_kind
-        self.tier_head=MonotonicOrdinalHead(dim) if loss_kind=="ordinal" else nn.Linear(dim,4)
+        self.request_norm=nn.LayerNorm(dim);self.dropout=nn.Dropout(dropout);self.loss_kind=loss_kind;self.num_tiers=num_tiers
+        self.tier_head=MonotonicOrdinalHead(dim,num_tiers) if loss_kind=="ordinal" else nn.Linear(dim,num_tiers)
     def encode_chunk_batch(self,input_ids,attention_mask):
         out=self.encoder(input_ids=input_ids,attention_mask=attention_mask,use_cache=False)
         return last_non_padding(out.last_hidden_state,attention_mask)

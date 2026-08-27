@@ -11,10 +11,9 @@ DOMAIN_DEFINITIONS = {
     "affective": "Emotion, sentiment, empathy, interpersonal affect, or emotional-state understanding.",
 }
 TIER_POLICY = """The tier is the minimum domain-specific model-capability group needed to solve the request reliably. The frozen labels were derived from real model outcomes: a group is sufficient only when at least 60% of its evaluated core models succeeded.
-T1: the lowest-capability group is sufficient.
-T2: T1 is insufficient; the second capability group is the first sufficient group.
-T3: groups T1-T2 are insufficient; the strong third group is first sufficient.
-T4: groups T1-T3 are insufficient; the strongest/frontier group is first sufficient.
+T1: cheap/small capability is sufficient (old T1).
+T2: T1 is insufficient; capable mid-range capability is required (merged old T2 and T3).
+T3: T1-T2 are insufficient; the strongest capability permitted by the customer's ceiling is required (old T4).
 Choose the minimum sufficient tier. Do not classify merely from length or topic. Account for reasoning depth, constraints, specialization, ambiguity, and reliability required."""
 
 def build_domain_prompt(request_text: str) -> str:
@@ -30,7 +29,7 @@ REQUEST:
 def build_tier_prompt(request_text: str) -> str:
     return f"""Estimate only the minimum model capability tier required for this request. /no_think
 {TIER_POLICY}
-Return exactly one compact JSON object: {{"tier":<integer 1-4>}}. No domain and no explanation.
+Return exactly one compact JSON object: {{"tier":<integer 1-3>}}. No domain and no explanation.
 REQUEST:
 {request_text}"""
 

@@ -17,6 +17,6 @@ def calibration_report(predictions: pd.DataFrame) -> pd.DataFrame:
                      "mae":float(np.abs(delta).mean()) if len(part) else None,
                      "under_routing":float((delta<0).mean()) if len(part) else None,
                      "severe_under_routing":float((delta<=-2).mean()) if len(part) else None,
-                     "T4_to_T1_T2":int(((y==4)&(p<=2)).sum()),"T3_to_T1":int(((y==3)&(p==1)).sum())})
+                     "T3_to_T1":int(((y==3)&(p==1)).sum()),"T3_to_T2":int(((y==3)&(p==2)).sum()),
+                     "T2_to_T1":int(((y==2)&(p==1)).sum())})
     return pd.DataFrame(rows)
-

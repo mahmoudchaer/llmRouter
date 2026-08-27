@@ -24,6 +24,5 @@ class ModelRecord:
             raise ValueError("context_window must be positive")
         if self.input_price_per_1m < 0 or self.output_price_per_1m < 0:
             raise ValueError("Model prices must be non-negative")
-        if any(tier not in {1, 2, 3, 4} for tier in self.capability_by_domain.values()):
-            raise ValueError("Capability tiers must be in 1..4")
-
+        if any(tier not in {1, 2, 3} for tier in self.capability_by_domain.values()):
+            raise ValueError("Capability tiers must be in 1..3")

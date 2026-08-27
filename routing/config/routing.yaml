@@ -1,4 +1,5 @@
-version: routing_v1
+version: routing_v2_3tier
+tier_policy: "T1=old T1; T2=old T2+old T3; T3=old T4"
 domain_classifier:
   implementation: transformers_qwen
   model_id: Qwen/Qwen3-4B-Instruct-2507

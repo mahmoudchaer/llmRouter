@@ -22,4 +22,4 @@ def test_prompt_uses_frozen_empirical_policy():
     domain_prompt=build_domain_prompt("Fix this Python syntax error");tier_prompt=build_tier_prompt("Fix this Python syntax error")
     assert '{"domain":"<allowed_domain>"}' in domain_prompt and "Frozen empirical tier policy" not in domain_prompt
     assert "at least 60%" in tier_prompt and "minimum domain-specific model-capability group" in tier_prompt
-    assert '{"tier":<integer 1-4>}' in tier_prompt and "Allowed domains" not in tier_prompt
+    assert '{"tier":<integer 1-3>}' in tier_prompt and "Allowed domains" not in tier_prompt
