@@ -11,6 +11,16 @@ BRANCH="baseline3-training"
 
 cd "$REPO_DIR"
 
+# Metrics for completed runs are versioned in Git, while their large checkpoints
+# live outside Git. Hydrate the summaries so selection remains apples-to-apples.
+for completed_name in ce ordinal_w1; do
+  if [[ ! -f "$OUTPUT_ROOT/$completed_name/summary.json" && -f "$RESULT_ROOT/$completed_name/summary.json" ]]; then
+    mkdir -p "$OUTPUT_ROOT/$completed_name"
+    cp "$RESULT_ROOT/$completed_name/summary.json" "$OUTPUT_ROOT/$completed_name/summary.json"
+    [[ -f "$RESULT_ROOT/$completed_name/history.json" ]] && cp "$RESULT_ROOT/$completed_name/history.json" "$OUTPUT_ROOT/$completed_name/history.json"
+  fi
+done
+
 persist_run() {
   local name="$1"
   mkdir -p "$PERSIST_ROOT/$name" "$RESULT_ROOT/$name"
@@ -89,10 +99,18 @@ print(best,cfg['loss'],cfg['under_weight'],str(not cfg['structural']).lower())
 PY
 )"
 read -r FINAL_NAME FINAL_LOSS FINAL_WEIGHT FINAL_NO_STRUCT <<< "$FINAL_SPEC"
+FINAL_CHECKPOINT="$OUTPUT_ROOT/$FINAL_NAME/best"
+if [[ ! -f "$FINAL_CHECKPOINT/model.pt" ]]; then
+  # A migrated Git summary can win selection even when its large checkpoint was
+  # stored on the previous VM. Rebuild only that winner with the identical setup.
+  REBUILD_NAME="${FINAL_NAME}_checkpoint_rebuild"
+  run_training "$REBUILD_NAME" "$FINAL_LOSS" "$FINAL_WEIGHT" "$FINAL_NO_STRUCT"
+  FINAL_CHECKPOINT="$OUTPUT_ROOT/$REBUILD_NAME/best"
+fi
 TEST_NAME="${FINAL_NAME}_strict_test"
 if [[ ! -f "$OUTPUT_ROOT/$TEST_NAME/test_metrics.json" ]]; then
   cd "$TRAINING_DIR"
-  args=(-m src.run_tier_router_v1 --name "$TEST_NAME" --loss "$FINAL_LOSS" --under-weight "$FINAL_WEIGHT" --eval-test --checkpoint "$OUTPUT_ROOT/$FINAL_NAME/best")
+  args=(-m src.run_tier_router_v1 --name "$TEST_NAME" --loss "$FINAL_LOSS" --under-weight "$FINAL_WEIGHT" --eval-test --checkpoint "$FINAL_CHECKPOINT")
   [[ "$FINAL_NO_STRUCT" == "true" ]] && args+=(--no-struct)
   "$PYTHON" "${args[@]}" 2>&1 | tee "$OUTPUT_ROOT/${TEST_NAME}_console.log"
   status=${PIPESTATUS[0]}
